@@ -1,351 +1,422 @@
-import type { RepoData, FileTree } from './types';
-import { githubApi, fetchRepo } from './github';
+import type { RepoData, GitHubFile, Framework, Subsystem, SubsystemPattern, AnalysisResult, RepoVersion } from './types';
 
-export interface FileNode {
-  path: string;
-  name: string;
-  type: 'file' | 'directory';
-  size?: number;
-  extension?: string;
-  language?: string;
-  children?: FileNode[];
-  depth: number;
+/**
+ * Detects the framework used in a repository based on file patterns and dependencies
+ */
+export function detectFramework(repoData: RepoData, files: GitHubFile[]): Framework {
+  const filePaths = files.map(f => f.path.toLowerCase());
+  
+  // Check for Next.js first (more specific than React)
+  if (filePaths.some(path => path.includes('next.config.js') || path.includes('next.config.ts') || 
+                            path.includes('next.config.mjs') || path.includes('next.config.cjs'))) {
+    return 'nextjs';
+  }
+  
+  // Check for pages or app directory structure (Next.js)
+  if (filePaths.some(path => path.startsWith('pages/') || path.startsWith('app/')) &&
+      filePaths.some(path => path.includes('package.json'))) {
+    return 'nextjs';
+  }
+  
+  // Check for React
+  if (filePaths.some(path => path.includes('package.json'))) {
+    // We'll assume React if we find JSX/TSX files and package.json
+    const hasReactFiles = filePaths.some(path => 
+      path.endsWith('.jsx') || path.endsWith('.tsx')
+    );
+    if (hasReactFiles) {
+      return 'react';
+    }
+  }
+  
+  // Check for Svelte
+  if (filePaths.some(path => path.endsWith('.svelte')) ||
+      filePaths.some(path => path.includes('svelte.config.js') || path.includes('svelte.config.ts'))) {
+    return 'svelte';
+  }
+  
+  // Check for Flask
+  if (filePaths.some(path => path.includes('app.py') || path.includes('wsgi.py')) ||
+      filePaths.some(path => path.includes('requirements.txt') || path.includes('pyproject.toml'))) {
+    const hasPythonFiles = filePaths.some(path => path.endsWith('.py'));
+    if (hasPythonFiles) {
+      // Basic heuristic: if we see Flask-like patterns
+      if (filePaths.some(path => path.includes('app.py') || path.includes('run.py'))) {
+        return 'flask';
+      }
+    }
+  }
+  
+  // Check for FastAPI
+  if (filePaths.some(path => path.includes('main.py')) &&
+      filePaths.some(path => path.includes('requirements.txt') || path.includes('pyproject.toml'))) {
+    return 'fastapi';
+  }
+  
+  return 'unknown';
 }
 
-export interface RepositoryMetrics {
-  totalFiles: number;
-  totalDirectories: number;
-  totalSize: number;
-  fileTypes: Record<string, number>;
-  languages: Record<string, number>;
-  averageFileSize: number;
-  largestFiles: Array<{ path: string; size: number }>;
-  deepestPath: { path: string; depth: number };
-}
-
-export interface RepositoryStructure {
-  repository: RepoData;
-  fileTree: FileNode[];
-  metrics: RepositoryMetrics;
-  readme: string;
-  mainFiles: string[];
-  configFiles: string[];
-  documentationFiles: string[];
-  testFiles: string[];
-}
-
-export interface ArchitectureInsight {
-  type: 'pattern' | 'structure' | 'dependency' | 'quality';
-  title: string;
-  description: string;
-  files: string[];
-  importance: 'low' | 'medium' | 'high';
-}
-
-export class RepositoryAnalyzer {
-  private owner: string;
-  private repo: string;
-  private repository?: RepoData;
-
-  constructor(owner: string, repo: string) {
-    this.owner = owner;
-    this.repo = repo;
-  }
-
-  /**
-   * Analyze the complete repository structure
-   */
-  async analyze(): Promise<RepositoryStructure> {
-    // Get complete repository analysis
-    const analysisResult = await fetchRepo(this.owner, this.repo);
-    this.repository = analysisResult.repoData;
-    
-    // Build file tree from GitHub files
-    const fileTree = this.buildFileTree(analysisResult.fileTree);
-    
-    // Calculate metrics
-    const metrics = this.calculateMetrics(analysisResult.fileTree, analysisResult.languages);
-    
-    // Get README content
-    const readme = await this.getReadmeContent();
-
-    return {
-      repository: this.repository,
-      fileTree,
-      metrics,
-      readme,
-      mainFiles: analysisResult.mainFiles.map(f => f.path),
-      configFiles: analysisResult.configFiles.map(f => f.path),
-      documentationFiles: analysisResult.documentationFiles.map(f => f.path),
-      testFiles: analysisResult.testFiles.map(f => f.path)
-    };
-  }
-
-  /**
-   * Build hierarchical file tree from GitHub tree
-   */
-  private buildFileTree(tree: FileTree): FileNode[] {
-    const nodes = new Map<string, FileNode>();
-    const roots: FileNode[] = [];
-
-    // Create all nodes
-    for (const item of tree.tree) {
-      const pathParts = item.path.split('/');
-      const name = pathParts[pathParts.length - 1];
-      const extension = this.getFileExtension(name);
-      
-      const node: FileNode = {
-        path: item.path,
-        name,
-        type: item.type === 'tree' ? 'directory' : 'file',
-        size: item.size,
-        extension,
-        language: this.guessLanguage(extension),
-        children: item.type === 'tree' ? [] : undefined,
-        depth: pathParts.length - 1
-      };
-
-      nodes.set(item.path, node);
+/**
+ * Framework-specific subsystem patterns
+ */
+const FRAMEWORK_PATTERNS: Record<Framework, SubsystemPattern[]> = {
+  react: [
+    {
+      name: 'Components',
+      description: 'React components and UI elements',
+      patterns: ['src/components/', 'components/', 'src/ui/'],
+      extensions: ['.jsx', '.tsx', '.js', '.ts'],
+      priority: 1
+    },
+    {
+      name: 'Pages/Routes',
+      description: 'Page components and routing logic',
+      patterns: ['src/pages/', 'pages/', 'src/routes/', 'routes/', 'src/views/', 'views/'],
+      extensions: ['.jsx', '.tsx', '.js', '.ts'],
+      priority: 2
+    },
+    {
+      name: 'Hooks',
+      description: 'Custom React hooks',
+      patterns: ['src/hooks/', 'hooks/', 'src/lib/hooks/'],
+      extensions: ['.js', '.ts', '.jsx', '.tsx'],
+      priority: 3
+    },
+    {
+      name: 'Services/API',
+      description: 'API calls and external services',
+      patterns: ['src/services/', 'services/', 'src/api/', 'api/', 'src/lib/api/'],
+      extensions: ['.js', '.ts'],
+      priority: 4
+    },
+    {
+      name: 'Utils',
+      description: 'Utility functions and helpers',
+      patterns: ['src/utils/', 'utils/', 'src/lib/', 'lib/', 'src/helpers/', 'helpers/'],
+      extensions: ['.js', '.ts'],
+      priority: 5
+    },
+    {
+      name: 'Context/State',
+      description: 'State management and context providers',
+      patterns: ['src/context/', 'context/', 'src/store/', 'store/', 'src/state/', 'state/'],
+      extensions: ['.js', '.ts', '.jsx', '.tsx'],
+      priority: 6
     }
-
-    // Build hierarchy
-    for (const [path, node] of nodes) {
-      const parentPath = path.substring(0, path.lastIndexOf('/'));
-      
-      if (parentPath && nodes.has(parentPath)) {
-        const parent = nodes.get(parentPath)!;
-        if (!parent.children) parent.children = [];
-        parent.children.push(node);
-      } else {
-        roots.push(node);
-      }
+  ],
+  nextjs: [
+    {
+      name: 'Pages/Routes',
+      description: 'Next.js pages and app router routes',
+      patterns: ['pages/', 'app/', 'src/pages/', 'src/app/'],
+      extensions: ['.jsx', '.tsx', '.js', '.ts'],
+      priority: 1
+    },
+    {
+      name: 'Components',
+      description: 'React components and UI elements',
+      patterns: ['src/components/', 'components/', 'src/ui/', 'ui/'],
+      extensions: ['.jsx', '.tsx', '.js', '.ts'],
+      priority: 2
+    },
+    {
+      name: 'API Routes',
+      description: 'Next.js API routes',
+      patterns: ['pages/api/', 'app/api/', 'src/pages/api/', 'src/app/api/'],
+      extensions: ['.js', '.ts'],
+      priority: 3
+    },
+    {
+      name: 'Hooks',
+      description: 'Custom React hooks',
+      patterns: ['src/hooks/', 'hooks/', 'src/lib/hooks/'],
+      extensions: ['.js', '.ts', '.jsx', '.tsx'],
+      priority: 4
+    },
+    {
+      name: 'Services/API',
+      description: 'API calls and external services',
+      patterns: ['src/services/', 'services/', 'src/lib/api/', 'lib/api/'],
+      extensions: ['.js', '.ts'],
+      priority: 5
+    },
+    {
+      name: 'Utils',
+      description: 'Utility functions and helpers',
+      patterns: ['src/utils/', 'utils/', 'src/lib/', 'lib/', 'src/helpers/', 'helpers/'],
+      extensions: ['.js', '.ts'],
+      priority: 6
     }
-
-    // Sort children
-    const sortNodes = (nodes: FileNode[]) => {
-      nodes.sort((a, b) => {
-        if (a.type !== b.type) {
-          return a.type === 'directory' ? -1 : 1;
-        }
-        return a.name.localeCompare(b.name);
-      });
-      
-      nodes.forEach(node => {
-        if (node.children) {
-          sortNodes(node.children);
-        }
-      });
-    };
-
-    sortNodes(roots);
-    return roots;
-  }
-
-  /**
-   * Calculate repository metrics
-   */
-  private calculateMetrics(tree: FileTree, languages: Record<string, number>): RepositoryMetrics {
-    let totalFiles = 0;
-    let totalDirectories = 0;
-    let totalSize = 0;
-    const fileTypes: Record<string, number> = {};
-    const fileSizes: Array<{ path: string; size: number }> = [];
-    let deepestPath = { path: '', depth: 0 };
-
-    for (const item of tree.tree) {
-      if (item.type === 'blob') {
-        totalFiles++;
-        totalSize += item.size || 0;
-        
-        const extension = this.getFileExtension(item.path);
-        fileTypes[extension] = (fileTypes[extension] || 0) + 1;
-        
-        if (item.size) {
-          fileSizes.push({ path: item.path, size: item.size });
-        }
-      } else {
-        totalDirectories++;
-      }
-
-      const depth = item.path.split('/').length - 1;
-      if (depth > deepestPath.depth) {
-        deepestPath = { path: item.path, depth };
-      }
+  ],
+  svelte: [
+    {
+      name: 'Routes',
+      description: 'SvelteKit routes and pages',
+      patterns: ['src/routes/', 'routes/'],
+      extensions: ['.svelte', '.js', '.ts'],
+      priority: 1
+    },
+    {
+      name: 'Components',
+      description: 'Svelte components',
+      patterns: ['src/lib/components/', 'src/components/', 'components/', 'src/lib/'],
+      extensions: ['.svelte'],
+      priority: 2
+    },
+    {
+      name: 'Stores',
+      description: 'Svelte stores for state management',
+      patterns: ['src/lib/stores/', 'src/stores/', 'stores/'],
+      extensions: ['.js', '.ts'],
+      priority: 3
+    },
+    {
+      name: 'Actions',
+      description: 'Form actions and server-side logic',
+      patterns: ['src/lib/actions/', 'src/actions/', 'actions/'],
+      extensions: ['.js', '.ts'],
+      priority: 4
+    },
+    {
+      name: 'Utils',
+      description: 'Utility functions and helpers',
+      patterns: ['src/lib/utils/', 'src/utils/', 'utils/', 'src/lib/'],
+      extensions: ['.js', '.ts'],
+      priority: 5
     }
-
-    // Sort by size and get largest files
-    fileSizes.sort((a, b) => b.size - a.size);
-    const largestFiles = fileSizes.slice(0, 10);
-
-    return {
-      totalFiles,
-      totalDirectories,
-      totalSize,
-      fileTypes,
-      languages,
-      averageFileSize: totalFiles > 0 ? totalSize / totalFiles : 0,
-      largestFiles,
-      deepestPath
-    };
-  }
-
-  /**
-   * Get README content
-   */
-  private async getReadmeContent(): Promise<string> {
-    try {
-      return await githubApi.fetchFileContent(this.owner, this.repo, 'README.md');
-    } catch {
-      // Try other README variations
-      const readmeFiles = ['README.md', 'README.txt', 'README.rst', 'README'];
-      for (const file of readmeFiles) {
-        try {
-          return await githubApi.fetchFileContent(this.owner, this.repo, file);
-        } catch {
-          continue;
-        }
-      }
-      return '';
+  ],
+  flask: [
+    {
+      name: 'Routes/Endpoints',
+      description: 'Flask routes and API endpoints',
+      patterns: ['app/', 'src/', 'routes/', 'views/', 'blueprints/'],
+      extensions: ['.py'],
+      priority: 1
+    },
+    {
+      name: 'Models',
+      description: 'Database models and schemas',
+      patterns: ['models/', 'app/models/', 'src/models/'],
+      extensions: ['.py'],
+      priority: 2
+    },
+    {
+      name: 'Services',
+      description: 'Business logic and services',
+      patterns: ['services/', 'app/services/', 'src/services/'],
+      extensions: ['.py'],
+      priority: 3
+    },
+    {
+      name: 'Utils',
+      description: 'Utility functions and helpers',
+      patterns: ['utils/', 'helpers/', 'app/utils/', 'src/utils/'],
+      extensions: ['.py'],
+      priority: 4
+    },
+    {
+      name: 'Config',
+      description: 'Configuration files',
+      patterns: ['config/', 'app/config/', 'src/config/'],
+      extensions: ['.py', '.json', '.yaml', '.yml'],
+      priority: 5
+    },
+    {
+      name: 'Auth',
+      description: 'Authentication and authorization',
+      patterns: ['auth/', 'app/auth/', 'src/auth/'],
+      extensions: ['.py'],
+      priority: 6
     }
-  }
-
-  /**
-   * Generate architecture insights
-   */
-  async generateInsights(structure: RepositoryStructure): Promise<ArchitectureInsight[]> {
-    const insights: ArchitectureInsight[] = [];
-    
-    // Analyze project structure patterns
-    insights.push(...this.analyzeProjectStructure(structure));
-    
-    // Analyze configuration patterns
-    insights.push(...this.analyzeConfiguration(structure));
-    
-    // Analyze code organization
-    insights.push(...this.analyzeCodeOrganization(structure));
-
-    return insights;
-  }
-
-  private analyzeProjectStructure(structure: RepositoryStructure): ArchitectureInsight[] {
-    const insights: ArchitectureInsight[] = [];
-    const { fileTree, metrics } = structure;
-
-    // Check for common project patterns
-    const hasSource = fileTree.some(node => node.name === 'src' && node.type === 'directory');
-    const hasLib = fileTree.some(node => node.name === 'lib' && node.type === 'directory');
-    const hasComponents = this.findNodesInTree(fileTree, 'components').length > 0;
-
-    if (hasSource || hasLib) {
-      insights.push({
-        type: 'structure',
-        title: 'Well-organized source structure',
-        description: 'Project follows standard directory conventions with dedicated source folders',
-        files: hasSource ? ['src/'] : ['lib/'],
-        importance: 'medium'
-      });
+  ],
+  fastapi: [
+    {
+      name: 'Routes/Endpoints',
+      description: 'FastAPI routes and API endpoints',
+      patterns: ['app/', 'src/', 'routers/', 'routes/', 'api/'],
+      extensions: ['.py'],
+      priority: 1
+    },
+    {
+      name: 'Models',
+      description: 'Pydantic models and database schemas',
+      patterns: ['models/', 'app/models/', 'src/models/', 'schemas/'],
+      extensions: ['.py'],
+      priority: 2
+    },
+    {
+      name: 'Services',
+      description: 'Business logic and services',
+      patterns: ['services/', 'app/services/', 'src/services/'],
+      extensions: ['.py'],
+      priority: 3
+    },
+    {
+      name: 'Utils',
+      description: 'Utility functions and helpers',
+      patterns: ['utils/', 'helpers/', 'app/utils/', 'src/utils/'],
+      extensions: ['.py'],
+      priority: 4
+    },
+    {
+      name: 'Config',
+      description: 'Configuration files',
+      patterns: ['config/', 'app/config/', 'src/config/'],
+      extensions: ['.py', '.json', '.yaml', '.yml'],
+      priority: 5
+    },
+    {
+      name: 'Auth',
+      description: 'Authentication and authorization',
+      patterns: ['auth/', 'app/auth/', 'src/auth/'],
+      extensions: ['.py'],
+      priority: 6
     }
-
-    if (hasComponents) {
-      insights.push({
-        type: 'pattern',
-        title: 'Component-based architecture',
-        description: 'Project uses component-based architecture pattern',
-        files: ['components/'],
-        importance: 'medium'
-      });
-    }
-
-    return insights;
-  }
-
-  private analyzeConfiguration(structure: RepositoryStructure): ArchitectureInsight[] {
-    const insights: ArchitectureInsight[] = [];
-    const { configFiles } = structure;
-
-    if (configFiles.length > 5) {
-      insights.push({
-        type: 'quality',
-        title: 'Multiple configuration files',
-        description: 'Project has extensive configuration setup, indicating mature tooling',
-        files: configFiles.slice(0, 5),
-        importance: 'low'
-      });
-    }
-
-    return insights;
-  }
-
-  private analyzeCodeOrganization(structure: RepositoryStructure): ArchitectureInsight[] {
-    const insights: ArchitectureInsight[] = [];
-    const { metrics, testFiles } = structure;
-
-    const testRatio = testFiles.length / metrics.totalFiles;
-    if (testRatio > 0.2) {
-      insights.push({
-        type: 'quality',
-        title: 'Good test coverage structure',
-        description: 'Project has a substantial number of test files indicating good testing practices',
-        files: testFiles.slice(0, 5),
-        importance: 'high'
-      });
-    }
-
-    return insights;
-  }
-
-  private findNodesInTree(nodes: FileNode[], name: string): FileNode[] {
-    const results: FileNode[] = [];
-    
-    for (const node of nodes) {
-      if (node.name.toLowerCase().includes(name.toLowerCase())) {
-        results.push(node);
-      }
-      if (node.children) {
-        results.push(...this.findNodesInTree(node.children, name));
-      }
-    }
-    
-    return results;
-  }
-
-  private getFileExtension(path: string): string {
-    const parts = path.split('.');
-    return parts.length > 1 ? parts.pop()!.toLowerCase() : '';
-  }
-
-  private guessLanguage(extension: string): string | undefined {
-    const languageMap: Record<string, string> = {
-      'js': 'JavaScript',
-      'jsx': 'JavaScript',
-      'ts': 'TypeScript',
-      'tsx': 'TypeScript',
-      'py': 'Python',
-      'java': 'Java',
-      'go': 'Go',
-      'rs': 'Rust',
-      'php': 'PHP',
-      'rb': 'Ruby',
-      'cpp': 'C++',
-      'c': 'C',
-      'cs': 'C#',
-      'swift': 'Swift',
-      'kt': 'Kotlin',
-      'scala': 'Scala',
-      'clj': 'Clojure',
-      'hs': 'Haskell',
-      'ml': 'OCaml',
-      'elm': 'Elm',
-      'dart': 'Dart',
-      'vue': 'Vue',
-      'svelte': 'Svelte'
-    };
-
-    return languageMap[extension];
-  }
-}
-
-// Helper function to create analyzer instance
-export const createAnalyzer = (owner: string, repo: string) => {
-  return new RepositoryAnalyzer(owner, repo);
+  ],
+  unknown: []
 };
+
+/**
+ * Categorizes files into subsystems based on framework patterns
+ */
+export function categorizeFiles(files: GitHubFile[], framework: Framework): Subsystem[] {
+  const patterns = FRAMEWORK_PATTERNS[framework] || [];
+  const subsystems: Subsystem[] = [];
+  const categorizedFiles = new Set<string>();
+  
+  // Sort patterns by priority to ensure more specific patterns are matched first
+  const sortedPatterns = [...patterns].sort((a, b) => a.priority - b.priority);
+  
+  for (const pattern of sortedPatterns) {
+    const matchingFiles = files.filter(file => {
+      // Skip if already categorized
+      if (categorizedFiles.has(file.path)) {
+        return false;
+      }
+      
+      // Check if file matches any of the path patterns
+      const pathMatches = pattern.patterns.some(p => 
+        file.path.toLowerCase().includes(p.toLowerCase())
+      );
+      
+      // Check if file has matching extension (if specified)
+      const extensionMatches = !pattern.extensions || 
+        pattern.extensions.some(ext => file.path.toLowerCase().endsWith(ext));
+      
+      return pathMatches && extensionMatches && file.type === 'blob';
+    });
+    
+    if (matchingFiles.length > 0) {
+      subsystems.push({
+        name: pattern.name,
+        description: pattern.description,
+        files: matchingFiles,
+        pattern: pattern.patterns.join(', ')
+      });
+      
+      // Mark files as categorized
+      matchingFiles.forEach(file => categorizedFiles.add(file.path));
+    }
+  }
+  
+  // Add uncategorized files to a general subsystem if any exist
+  const uncategorizedFiles = files.filter(file => 
+    !categorizedFiles.has(file.path) && file.type === 'blob'
+  );
+  
+  if (uncategorizedFiles.length > 0) {
+    subsystems.push({
+      name: 'Other',
+      description: 'Files that don\'t fit into specific categories',
+      files: uncategorizedFiles,
+      pattern: 'Various paths'
+    });
+  }
+  
+  return subsystems;
+}
+
+/**
+ * Main analysis function that processes a repository
+ */
+export function analyzeRepo(repoData: RepoData, files: GitHubFile[]): AnalysisResult {
+  // Detect framework
+  const framework = detectFramework(repoData, files);
+  
+  // Categorize files into subsystems
+  const subsystems = categorizeFiles(files, framework);
+  
+  // Calculate language distribution
+  const languages: Record<string, number> = {};
+  files.forEach(file => {
+    if (file.type === 'blob' && file.size) {
+      const extension = file.path.split('.').pop()?.toLowerCase();
+      if (extension) {
+        // Map extensions to languages
+        const languageMap: Record<string, string> = {
+          'js': 'JavaScript',
+          'jsx': 'JavaScript',
+          'ts': 'TypeScript', 
+          'tsx': 'TypeScript',
+          'py': 'Python',
+          'svelte': 'Svelte',
+          'html': 'HTML',
+          'css': 'CSS',
+          'scss': 'SCSS',
+          'json': 'JSON',
+          'md': 'Markdown',
+          'yml': 'YAML',
+          'yaml': 'YAML'
+        };
+        
+        const language = languageMap[extension] || extension.toUpperCase();
+        languages[language] = (languages[language] || 0) + (file.size || 0);
+      }
+    }
+  });
+  
+  // Categorize special files
+  const mainFiles = files.filter(file => 
+    ['readme.md', 'index.js', 'index.ts', 'main.py', 'app.py', 'index.html', 'package.json'].includes(file.path.toLowerCase())
+  );
+  
+  const configFiles = files.filter(file => {
+    const path = file.path.toLowerCase();
+    return path.includes('config') || path.endsWith('.config.js') || path.endsWith('.config.ts') ||
+           path.includes('package.json') || path.includes('requirements.txt') || 
+           path.includes('pyproject.toml') || path.includes('.env') || path.includes('dockerfile');
+  });
+  
+  const documentationFiles = files.filter(file => {
+    const path = file.path.toLowerCase();
+    return path.endsWith('.md') || path.includes('docs/') || path.includes('documentation/');
+  });
+  
+  const testFiles = files.filter(file => {
+    const path = file.path.toLowerCase();
+    return path.includes('test') || path.includes('spec') || path.includes('__tests__/');
+  });
+  
+  // Create version info
+  const version: RepoVersion = {
+    pushedAt: repoData.pushed_at,
+    updatedAt: repoData.updated_at,
+    defaultBranch: repoData.default_branch,
+    fileTreeSha: 'current' // This would be set by the calling function
+  };
+  
+  return {
+    metadata: repoData,
+    fileTree: files,
+    version,
+    analyzedAt: new Date().toISOString(),
+    fileCount: files.filter(f => f.type === 'blob').length,
+    languages,
+    framework,
+    subsystems,
+    mainFiles,
+    configFiles,
+    documentationFiles,
+    testFiles
+  };
+}
