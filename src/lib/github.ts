@@ -16,6 +16,8 @@ import {
   GitHubInvalidUrlError
 } from './types';
 
+import { analyzeRepo } from './analyzer';
+
 const GITHUB_API_BASE = 'https://api.github.com';
 
 /**
@@ -83,7 +85,7 @@ class GitHubAPI {
 
       if (response.status === 404) {
         // Check if it might be a private repo or doesn't exist
-        const repoPath = url.match(/\/repos\/([^\/]+)\/([^\/]+)(?:\/|$)/);
+        const repoPath = endpoint.match(/\/repos\/([^\/]+)\/([^\/]+)(?:\/|$)/);
         if (repoPath) {
           throw new GitHubRepoNotFoundError(
             `Repository not found or is private. Only public repositories are supported. Please check the repository exists and is publicly accessible.`
@@ -161,35 +163,13 @@ class GitHubAPI {
       );
       const fileTree = treeResponse.data;
 
-      // Fetch languages
-      const languagesResponse = await this.request<Record<string, number>>(
-        `/repos/${owner}/${repo}/languages`
-      );
-      const languages = languagesResponse.data;
+      // Use the new analyzer to process the repository
+      const analysisResult = analyzeRepo(repoData, fileTree.tree);
 
-      // Create version info
-      const version: RepoVersion = {
-        pushedAt: repoData.pushed_at,
-        updatedAt: repoData.updated_at,
-        defaultBranch: repoData.default_branch,
-        fileTreeSha: fileTree.sha
-      };
+      // Update the file tree SHA in the version
+      analysisResult.version.fileTreeSha = fileTree.sha;
 
-      // Categorize files
-      const { mainFiles, configFiles, documentationFiles, testFiles } = this.categorizeFiles(fileTree.tree);
-
-      return {
-        repoData,
-        fileTree,
-        version,
-        analyzedAt: new Date().toISOString(),
-        fileCount: fileTree.tree.filter(item => item.type === 'blob').length,
-        languages,
-        mainFiles,
-        configFiles,
-        documentationFiles,
-        testFiles
-      };
+      return analysisResult;
     } catch (error) {
       if (error instanceof GitHubApiError && error.status === 404) {
         throw new GitHubRepoNotFoundError(owner, repo);
@@ -232,45 +212,6 @@ class GitHubAPI {
     }
   }
 
-  /**
-   * Categorize files by their purpose
-   */
-  private categorizeFiles(files: GitHubFile[]): {
-    mainFiles: GitHubFile[];
-    configFiles: GitHubFile[];
-    documentationFiles: GitHubFile[];
-    testFiles: GitHubFile[];
-  } {
-    const mainFiles: GitHubFile[] = [];
-    const configFiles: GitHubFile[] = [];
-    const documentationFiles: GitHubFile[] = [];
-    const testFiles: GitHubFile[] = [];
-
-    // File patterns
-    const mainFilePatterns = /^(index|main|app|server|client)\.(js|ts|jsx|tsx|py|java|go|rs|php|rb|cpp|c|cs|swift|kt|scala|clj|hs|ml|elm|dart)$/i;
-    const configFilePatterns = /\.(json|yaml|yml|toml|ini|cfg|conf|config)$|^(Dockerfile|Makefile|CMakeLists\.txt|build\.gradle|pom\.xml|requirements\.txt|package\.json|composer\.json|Cargo\.toml|go\.mod|setup\.py|pyproject\.toml)$/i;
-    const docFilePatterns = /\.(md|txt|rst|adoc|org)$|^(README|CHANGELOG|CONTRIBUTING|LICENSE|DOCS|GUIDE|MANUAL)/i;
-    const testFilePatterns = /\.(test|spec)\.|\/test\/|\/tests\/|\/__tests__\/|\.test\.|\.spec\.|_test\.|_spec\./i;
-
-    for (const file of files) {
-      if (file.type !== 'blob') continue;
-
-      const fileName = file.path.split('/').pop() || '';
-      const filePath = file.path;
-
-      if (testFilePatterns.test(filePath)) {
-        testFiles.push(file);
-      } else if (mainFilePatterns.test(fileName)) {
-        mainFiles.push(file);
-      } else if (configFilePatterns.test(fileName)) {
-        configFiles.push(file);
-      } else if (docFilePatterns.test(fileName)) {
-        documentationFiles.push(file);
-      }
-    }
-
-    return { mainFiles, configFiles, documentationFiles, testFiles };
-  }
 }
 
 // Helper functions
