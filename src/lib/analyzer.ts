@@ -440,7 +440,7 @@ export function analyzeRepo(repoData: RepoData, files: GitHubFile[]): AnalysisRe
 /**
  * Makes a request to OpenAI API with proper error handling
  */
-async function makeOpenAIRequest(prompt: string, model: string = 'gpt-4o-mini'): Promise<OpenAIResponse> {
+export async function makeOpenAIRequest(prompt: string, model: string = 'gpt-4o-mini'): Promise<OpenAIResponse> {
   if (!OPENAI_API_KEY) {
     return {
       success: false,
