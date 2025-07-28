@@ -1,20 +1,20 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
-  import { firestore } from "$lib/services/firestore";
-  import type { StoredRepository } from "$types/repository";
+  import { getRecentRepositories, checkRepositoryByUrl, findOrCreateRepo } from "$lib/services/repository";
+  import type { FirestoreRepo } from "$lib/types";
   import { parseGitHubUrl } from "$lib/github";
 
   let repoUrl = $state("");
   let isLoading = $state(false);
   let error = $state("");
-  let recentRepos = $state<StoredRepository[]>([]);
+  let recentRepos = $state<FirestoreRepo[]>([]);
   let loadingRecent = $state(true);
 
   // Load recent repositories on mount
   onMount(async () => {
     try {
-      recentRepos = await firestore.getRecentRepositories(5);
+      recentRepos = await getRecentRepositories(5);
     } catch (err) {
       console.error("Failed to load recent repositories:", err);
     } finally {
@@ -56,17 +56,18 @@
     isLoading = true;
 
     try {
-      // Check if repository already exists and is fresh
-      const existingRepo = await firestore.checkRepository(repoUrl);
+      // Check if repository already exists
+      const existingRepo = await checkRepositoryByUrl(repoUrl);
 
-      if (existingRepo && !firestore.isRepositoryStale(existingRepo)) {
-        // Repository is fresh, redirect directly to results
+      if (existingRepo && existingRepo.analysisStatus === 'completed') {
+        // Repository exists and is analyzed, redirect directly to results
         goto(`/repo/${existingRepo.id}`);
         return;
       }
 
-      // Repository needs analysis
-      goto(`/analyze?url=${encodeURIComponent(repoUrl)}`);
+      // Find or create repository and start analysis
+      const docId = await findOrCreateRepo(repoUrl);
+      goto(`/analyze?url=${encodeURIComponent(repoUrl)}&docId=${docId}`);
     } catch (err) {
       error =
         err instanceof Error ? err.message : "Failed to process repository URL";
@@ -75,7 +76,7 @@
     }
   };
 
-  const handleRecentRepoClick = (repo: StoredRepository) => {
+  const handleRecentRepoClick = (repo: FirestoreRepo) => {
     goto(`/repo/${repo.id}`);
   };
 
@@ -210,7 +211,7 @@
                       <ion-label>{repo.stars}</ion-label>
                     </ion-chip>
                     <span class="analyzed-time"
-                      >{formatTimeAgo(repo.lastAnalyzed)}</span
+                      >{formatTimeAgo(new Date(repo.lastAnalyzed))}</span
                     >
                   </div>
                 </ion-label>
