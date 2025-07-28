@@ -1,121 +1,345 @@
 import { browser } from '$app/environment';
 import { getRepoById } from '$lib/services/repository';
-import type { 
-  RepoStore, 
-  AnalysisStatusStore, 
-  ChatMessage, 
-  NavigationState, 
-  FirestoreRepo, 
+import type {
+  RepoState,
+  DocumentationData,
+  ChatHistory,
+  NavigationState,
+  UserPreferences,
+  SearchState,
+  CacheManager,
+  CacheEntry,
+  FirestoreRepo,
   AnalysisResult,
-  Subsystem
-} from '$lib/types';
+  RepoData,
+  Subsystem,
+  SubsystemDescription,
+  SearchResult,
+  ChatMessage,
+  Framework,
+  StoreError,
+  PersistenceError,
+  ValidationError,
+  PersistenceConfig
+} from './types';
 
-// Storage keys for localStorage
-const STORAGE_KEYS = {
-  RECENT_REPOS: 'repolens_recent_repos',
-  NAVIGATION_PREFS: 'repolens_navigation_prefs',
-  UI_STATE: 'repolens_ui_state'
-} as const;
+// Default configurations
+const DEFAULT_USER_PREFERENCES: UserPreferences = {
+  theme: 'system',
+  language: 'en',
+  codeEditor: {
+    fontSize: 14,
+    fontFamily: 'Monaco, Menlo, "Ubuntu Mono", monospace',
+    lineNumbers: true,
+    wordWrap: true,
+    theme: 'dark'
+  },
+  analysis: {
+    includeTests: true,
+    includeConfig: true,
+    maxFileSize: 1024 * 1024, // 1MB
+    languages: ['typescript', 'javascript', 'python', 'svelte']
+  },
+  notifications: {
+    analysisComplete: true,
+    newInsights: true,
+    errors: true
+  },
+  documentation: {
+    autoExpandSubsystems: true,
+    showFilePreview: true,
+    enableAIDescriptions: true,
+    recentViewLimit: 10
+  },
+  navigation: {
+    rememberLastPage: true,
+    showBreadcrumbs: true,
+    sidebarCollapsed: false
+  }
+};
+
+const PERSISTENCE_CONFIG: PersistenceConfig = {
+  storage: 'localStorage',
+  key: 'repolens-store',
+  version: '1.0.0',
+  compress: false,
+  encrypt: false,
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  serializer: {
+    serialize: (data: any) => JSON.stringify(data, mapReplacer),
+    deserialize: (data: string) => JSON.parse(data, mapReviver)
+  }
+};
+
+// Map serialization helpers
+function mapReplacer(key: string, value: any): any {
+  if (value instanceof Map) {
+    return {
+      dataType: 'Map',
+      value: Array.from(value.entries())
+    };
+  }
+  return value;
+}
+
+function mapReviver(key: string, value: any): any {
+  if (typeof value === 'object' && value !== null && value.dataType === 'Map') {
+    return new Map(value.value);
+  }
+  return value;
+}
 
 // Initialize default states
-const createDefaultRepoStore = (): RepoStore => ({
-  docId: null,
-  url: null,
-  owner: null,
-  name: null,
-  fullName: null,
-  description: null,
-  language: null,
-  stars: 0,
-  forks: 0,
-  defaultBranch: null,
-  analysisData: null,
-  analysisStatus: 'pending',
-  lastAnalyzed: null,
-  isLoading: false,
-  error: null
+const createDefaultRepoState = (): RepoState => ({
+  current: null,
+  analysis: null,
+  loading: false,
+  error: null,
+  lastUpdated: null,
+  freshness: {
+    isStale: false,
+    lastChecked: new Date().toISOString()
+  }
 });
 
-const createDefaultAnalysisStatus = (): AnalysisStatusStore => ({
-  isAnalyzing: false,
-  currentStep: '',
-  progress: 0,
-  totalSteps: 6,
+const createDefaultDocumentationData = (): DocumentationData => ({
+  subsystems: [],
+  searchResults: [],
+  recentlyViewed: [],
+  aiDescriptions: new Map(),
+  currentSubsystem: null,
+  searchQuery: '',
+  filterState: {
+    framework: 'all',
+    sortBy: 'name',
+    showEmptySubsystems: false
+  }
+});
+
+const createDefaultChatHistory = (): ChatHistory => ({
+  sessions: new Map(),
+  currentSession: null,
+  isStreaming: false,
   error: null,
-  completedAt: null
+  preferences: {
+    enableAutoScroll: true,
+    showTimestamps: true,
+    enableSounds: false,
+    maxHistorySize: 100
+  }
 });
 
 const createDefaultNavigationState = (): NavigationState => ({
   currentPage: 'home',
   previousPage: null,
-  repoDocId: null,
   breadcrumbs: [],
+  repoContext: {
+    repoId: null,
+    repoName: null,
+    currentSubsystem: null
+  },
   sidebarOpen: false,
   selectedFiles: [],
-  expandedDirectories: []
+  expandedDirectories: [],
+  scrollPositions: new Map(),
+  routeHistory: []
 });
 
-// Create reactive stores using Svelte 5 runes
-export const currentRepo = $state<RepoStore>(createDefaultRepoStore());
-export const analysisStatus = $state<AnalysisStatusStore>(createDefaultAnalysisStatus());
-export const chatHistory = $state<ChatMessage[]>([]);
-export const navigationState = $state<NavigationState>(createDefaultNavigationState());
+const createDefaultSearchState = (): SearchState => ({
+  query: '',
+  results: [],
+  isSearching: false,
+  filters: {
+    type: 'all',
+    languages: [],
+    subsystems: [],
+  },
+  recentSearches: [],
+  suggestions: []
+});
 
-// Derived states
-export const isRepoLoaded = $derived(currentRepo.docId !== null);
-export const isAnalysisComplete = $derived(currentRepo.analysisStatus === 'completed');
-export const hasAnalysisData = $derived(currentRepo.analysisData !== null);
-export const currentRepoFullName = $derived(currentRepo.fullName || 'Unknown Repository');
+const createDefaultCacheManager = (): CacheManager => ({
+  repositories: new Map(),
+  analyses: new Map(),
+  aiDescriptions: new Map(),
+  maxSize: 50 * 1024 * 1024, // 50MB
+  currentSize: 0,
+  lastCleanup: new Date().toISOString()
+});
 
-// Store functions with Firestore integration
-
-/**
- * Set repository data from Firestore document
- */
-export function setRepoFromFirestore(docId: string, repoData: FirestoreRepo): void {
-  Object.assign(currentRepo, {
-    docId,
-    url: repoData.url,
-    owner: repoData.owner,
-    name: repoData.name,
-    fullName: repoData.fullName,
-    description: repoData.description,
-    language: repoData.language,
-    stars: repoData.stars,
-    forks: repoData.forks,
-    defaultBranch: repoData.defaultBranch,
-    analysisData: repoData.analysisData || null,
-    analysisStatus: repoData.analysisStatus,
-    lastAnalyzed: repoData.lastAnalyzed,
-    isLoading: false,
-    error: repoData.errorMessage || null
-  });
-
-  // Update navigation state
-  navigationState.repoDocId = docId;
+// Core stores using Svelte 5 runes
+export const currentRepo = (() => {
+  let state = $state<RepoState>(createDefaultRepoState());
   
-  // Cache recent repository
-  if (browser) {
-    cacheRecentRepo(docId, repoData);
-  }
-}
-
-/**
- * Update analysis results in current repository
- */
-export function updateAnalysisResults(analysisData: AnalysisResult): void {
-  if (currentRepo.docId) {
-    currentRepo.analysisData = analysisData;
-    currentRepo.analysisStatus = 'completed';
-    currentRepo.lastAnalyzed = new Date().toISOString();
-    currentRepo.error = null;
+  return {
+    get value() { return state; },
     
-    // Update analysis status
-    analysisStatus.isAnalyzing = false;
-    analysisStatus.completedAt = new Date().toISOString();
-    analysisStatus.progress = 100;
-  }
-}
+    // Repository management
+    setRepo(repo: FirestoreRepo): void {
+      try {
+        validateRepo(repo);
+        state.current = repo;
+        state.analysis = repo.analysisData || null;
+        state.error = null;
+        state.lastUpdated = new Date().toISOString();
+        persistState('currentRepo', state);
+      } catch (error) {
+        state.error = error instanceof Error ? error.message : 'Failed to set repository';
+        throw new ValidationError('Invalid repository data', 'repo', repo);
+      }
+    },
+    
+    setLoading(loading: boolean): void {
+      state.loading = loading;
+    },
+    
+    setError(error: string | null): void {
+      state.error = error;
+      state.loading = false;
+    },
+    
+    updateFreshness(isStale: boolean, reason?: 'github-updated' | 'analysis-missing' | 'firestore-error'): void {
+      state.freshness = {
+        isStale,
+        lastChecked: new Date().toISOString(),
+        reason
+      };
+    },
+    
+    clear(): void {
+      state = createDefaultRepoState();
+      clearPersistedState('currentRepo');
+    }
+  };
+})();
+
+export const documentationData = (() => {
+  let state = $state<DocumentationData>(createDefaultDocumentationData());
+  
+  return {
+    get value() { return state; },
+    
+    // Analysis data management
+    setRepoAnalysis(repoData: RepoData, analysisData: AnalysisResult): void {
+      try {
+        state.subsystems = analysisData.subsystems.map(subsystem => {
+          const description = analysisData.subsystemDescriptions?.find(
+            desc => desc.name === subsystem.name
+          );
+          return { ...subsystem, description };
+        });
+        
+        // Clear previous search results when setting new analysis
+        state.searchResults = [];
+        state.searchQuery = '';
+        
+        persistState('documentationData', state);
+      } catch (error) {
+        throw new StoreError('Failed to set repository analysis', 'ANALYSIS_ERROR', { repoData, analysisData });
+      }
+    },
+    
+    // Subsystem operations
+    getSubsystemData(subsystemName: string): SubsystemDescription | null {
+      const subsystem = state.subsystems.find(s => s.name === subsystemName);
+      return subsystem?.description || null;
+    },
+    
+    setCurrentSubsystem(subsystemName: string | null): void {
+      state.currentSubsystem = subsystemName;
+      if (subsystemName) {
+        this.addToRecentlyViewed(subsystemName);
+      }
+    },
+    
+    addToRecentlyViewed(subsystemName: string): void {
+      const repoContext = navigationState.value.repoContext;
+      if (!repoContext.repoId || !repoContext.repoName) return;
+      
+      // Remove existing entry if present
+      state.recentlyViewed = state.recentlyViewed.filter(
+        item => !(item.subsystemName === subsystemName && item.repoId === repoContext.repoId)
+      );
+      
+      // Add to beginning
+      state.recentlyViewed.unshift({
+        subsystemName,
+        timestamp: new Date().toISOString(),
+        repoId: repoContext.repoId,
+        repoName: repoContext.repoName
+      });
+      
+      // Limit to preference setting
+      const limit = userPreferences.value.documentation.recentViewLimit;
+      state.recentlyViewed = state.recentlyViewed.slice(0, limit);
+      
+      persistState('documentationData', state);
+    },
+    
+    // Search operations
+    updateSearchResults(query: string, results: SearchResult[]): void {
+      state.searchQuery = query;
+      state.searchResults = results;
+      
+      // Add to recent searches if query is meaningful
+      if (query.trim().length > 2) {
+        this.addToRecentSearches(query, results.length);
+      }
+    },
+    
+    addToRecentSearches(query: string, resultCount: number): void {
+      // Remove existing entry
+      state.recentlyViewed = state.recentlyViewed.filter(
+        search => search.query !== query
+      );
+      
+      // Add new entry
+      searchState.value.recentSearches.unshift({
+        query,
+        timestamp: new Date().toISOString(),
+        resultCount
+      });
+      
+      // Limit recent searches
+      searchState.value.recentSearches = searchState.value.recentSearches.slice(0, 20);
+    },
+    
+    // Filter operations
+    setFilterState(filters: Partial<DocumentationData['filterState']>): void {
+      state.filterState = { ...state.filterState, ...filters };
+      persistState('documentationData', state);
+    },
+    
+    // AI descriptions
+    cacheAIDescription(key: string, content: string, expirationHours: number = 24): void {
+      const expiresAt = new Date(Date.now() + expirationHours * 60 * 60 * 1000).toISOString();
+      state.aiDescriptions.set(key, {
+        content,
+        timestamp: new Date().toISOString(),
+        expiresAt
+      });
+      persistState('documentationData', state);
+    },
+    
+    getAIDescription(key: string): string | null {
+      const cached = state.aiDescriptions.get(key);
+      if (!cached) return null;
+      
+      // Check expiration
+      if (new Date(cached.expiresAt) < new Date()) {
+        state.aiDescriptions.delete(key);
+        return null;
+      }
+      
+      return cached.content;
+    },
+    
+    clear(): void {
+      state = createDefaultDocumentationData();
+      clearPersistedState('documentationData');
+    }
+  };
+})();
 
 /**
  * Sync repository data with Firestore
