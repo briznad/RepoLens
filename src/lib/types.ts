@@ -361,13 +361,35 @@ export interface GitHubFileContent {
   };
 }
 
+// Framework detection types
+export type Framework = 'react' | 'nextjs' | 'svelte' | 'flask' | 'fastapi' | 'unknown';
+
+// Subsystem types
+export interface Subsystem {
+  name: string;
+  description: string;
+  files: GitHubFile[];
+  pattern: string;
+}
+
+export interface SubsystemPattern {
+  name: string;
+  description: string;
+  patterns: string[];
+  extensions?: string[];
+  priority: number;
+}
+
+// Updated AnalysisResult with framework and subsystems
 export interface AnalysisResult {
-  repoData: RepoData;
-  fileTree: FileTree;
+  metadata: RepoData;
+  fileTree: GitHubFile[];
   version: RepoVersion;
   analyzedAt: string;
   fileCount: number;
   languages: Record<string, number>;
+  framework: Framework;
+  subsystems: Subsystem[];
   mainFiles: GitHubFile[];
   configFiles: GitHubFile[];
   documentationFiles: GitHubFile[];
@@ -437,6 +459,88 @@ export class GitHubInvalidUrlError extends Error {
     super(`Invalid GitHub URL: ${url}`);
     this.name = 'GitHubInvalidUrlError';
   }
+}
+
+// Firestore document interfaces
+export type AnalysisStatus = 'pending' | 'analyzing' | 'completed' | 'failed';
+
+// Store interfaces for application state
+export interface RepoStore {
+  docId: string | null;
+  url: string | null;
+  owner: string | null;
+  name: string | null;
+  fullName: string | null;
+  description: string | null;
+  language: string | null;
+  stars: number;
+  forks: number;
+  defaultBranch: string | null;
+  analysisData: AnalysisResult | null;
+  analysisStatus: AnalysisStatus;
+  lastAnalyzed: string | null;
+  isLoading: boolean;
+  error: string | null;
+}
+
+export interface AnalysisStatusStore {
+  isAnalyzing: boolean;
+  currentStep: string;
+  progress: number;
+  totalSteps: number;
+  error: string | null;
+  completedAt: string | null;
+}
+
+export interface ChatMessage {
+  id: string;
+  content: string;
+  role: 'user' | 'assistant';
+  timestamp: string;
+  repoDocId?: string;
+  metadata?: {
+    files?: string[];
+    codeBlocks?: CodeBlock[];
+    suggestions?: string[];
+  };
+}
+
+export interface NavigationState {
+  currentPage: 'home' | 'analyze' | 'repo' | 'chat';
+  previousPage: string | null;
+  repoDocId: string | null;
+  breadcrumbs: Array<{
+    label: string;
+    path: string;
+  }>;
+  sidebarOpen: boolean;
+  selectedFiles: string[];
+  expandedDirectories: string[];
+}
+
+export interface RepoDocument {
+  id: string;
+  url: string;
+  owner: string;
+  name: string;
+  fullName: string;
+  description: string | null;
+  language: string | null;
+  stars: number;
+  forks: number;
+  visibility: 'public' | 'private';
+  defaultBranch: string;
+  githubPushedAt: string; // ISO date string from GitHub
+  lastAnalyzed: string; // ISO date string when analysis was completed
+  analysisStatus: AnalysisStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FirestoreRepo extends RepoDocument {
+  // Firestore metadata
+  analysisData?: AnalysisResult;
+  errorMessage?: string;
 }
 
 // Export all types for easier importing
