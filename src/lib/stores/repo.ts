@@ -1,53 +1,10 @@
-import type { Writable, Readable, Unsubscriber } from 'svelte/store';
+// This file has been replaced by /src/lib/stores.ts
+// Re-export the new stores for backward compatibility
 
-import { writable, derived } from 'svelte/store';
-
-import { error } from '@sveltejs/kit';
-
-
-type Repo = {
-	id: string;
-};
-
-
-class RepoStore {
-	public url : Writable<string>;
-
-	public repo  : Readable<null | Repo>;
-
-
-	constructor() {
-		this.url   = writable('');
-		this.repo  = this.initRepo();
-	}
-
-
-	private initRepo() : Readable<null | Repo> {
-		return derived(
-			[
-				this.url,
-			],
-			(
-				[
-					$url,
-				],
-				set : (value : any) => void,
-			) : Unsubscriber => {
-				let unsubscribe : undefined | (() => void);
-
-				const unsubscriber = () => unsubscribe?.();
-
-				if (!($userId && $code)) {
-					set(null);
-
-					return unsubscriber;
-				}
-
-				return unsubscriber;
-			},
-			null,
-		);
-	}
-}
-
-export const repoStore = new RepoStore();
+export { 
+  currentRepository as repoStore,
+  currentSession,
+  sessionActions,
+  chatActions,
+  uiActions
+} from '../stores';
