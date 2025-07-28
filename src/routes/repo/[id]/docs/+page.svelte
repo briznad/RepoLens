@@ -140,7 +140,7 @@
   };
 
   const handleSubsystemClick = (subsystemName: string) => {
-    goto(`/repo/${repoId}/subsystem/${encodeURIComponent(subsystemName)}`);
+    goto(`/repo/${repoId}/docs/${encodeURIComponent(subsystemName)}`);
   };
 
   const handleGitHubClick = () => {
