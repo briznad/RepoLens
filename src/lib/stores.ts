@@ -341,317 +341,652 @@ export const documentationData = (() => {
   };
 })();
 
-/**
- * Sync repository data with Firestore
- */
-export async function syncWithFirestore(docId: string): Promise<void> {
+export const chatHistory = (() => {
+  let state = $state<ChatHistory>(createDefaultChatHistory());
+  
+  return {
+    get value() { return state; },
+    
+    // Session management
+    createSession(repoId: string): string {
+      const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      state.sessions.set(sessionId, {
+        repoId,
+        messages: [],
+        createdAt: new Date().toISOString(),
+        lastUpdated: new Date().toISOString()
+      });
+      state.currentSession = sessionId;
+      persistState('chatHistory', state);
+      return sessionId;
+    },
+    
+    setCurrentSession(sessionId: string | null): void {
+      if (sessionId && state.sessions.has(sessionId)) {
+        state.currentSession = sessionId;
+      } else {
+        state.currentSession = null;
+      }
+    },
+    
+    // Message operations
+    addMessage(message: ChatMessage): void {
+      const sessionId = state.currentSession;
+      if (!sessionId) {
+        throw new StoreError('No active chat session', 'NO_SESSION');
+      }
+      
+      const session = state.sessions.get(sessionId);
+      if (!session) {
+        throw new StoreError('Chat session not found', 'SESSION_NOT_FOUND', { sessionId });
+      }
+      
+      session.messages.push(message);
+      session.lastUpdated = new Date().toISOString();
+      
+      // Limit message history
+      const maxSize = state.preferences.maxHistorySize;
+      if (session.messages.length > maxSize) {
+        session.messages = session.messages.slice(-maxSize);
+      }
+      
+      persistState('chatHistory', state);
+    },
+    
+    setStreaming(isStreaming: boolean): void {
+      state.isStreaming = isStreaming;
+    },
+    
+    setError(error: string | null): void {
+      state.error = error;
+    },
+    
+    // Session operations
+    getSessionMessages(sessionId: string): ChatMessage[] {
+      return state.sessions.get(sessionId)?.messages || [];
+    },
+    
+    deleteSession(sessionId: string): void {
+      state.sessions.delete(sessionId);
+      if (state.currentSession === sessionId) {
+        state.currentSession = null;
+      }
+      persistState('chatHistory', state);
+    },
+    
+    clearAllSessions(): void {
+      state.sessions.clear();
+      state.currentSession = null;
+      persistState('chatHistory', state);
+    },
+    
+    clear(): void {
+      state = createDefaultChatHistory();
+      clearPersistedState('chatHistory');
+    }
+  };
+})();
+
+export const navigationState = (() => {
+  let state = $state<NavigationState>(createDefaultNavigationState());
+  
+  return {
+    get value() { return state; },
+    
+    // Page navigation
+    setCurrentPage(page: NavigationState['currentPage']): void {
+      state.previousPage = state.currentPage;
+      state.currentPage = page;
+      state.routeHistory.push(page);
+      
+      // Limit route history
+      if (state.routeHistory.length > 20) {
+        state.routeHistory = state.routeHistory.slice(-20);
+      }
+      
+      persistState('navigationState', state);
+    },
+    
+    // Repository context
+    setRepoContext(repoId: string | null, repoName: string | null): void {
+      state.repoContext.repoId = repoId;
+      state.repoContext.repoName = repoName;
+      state.repoContext.currentSubsystem = null;
+      persistState('navigationState', state);
+    },
+    
+    setCurrentSubsystem(subsystemName: string | null): void {
+      state.repoContext.currentSubsystem = subsystemName;
+    },
+    
+    // Breadcrumbs
+    setBreadcrumbs(breadcrumbs: NavigationState['breadcrumbs']): void {
+      state.breadcrumbs = breadcrumbs;
+    },
+    
+    addBreadcrumb(label: string, path: string, icon?: string): void {
+      const existingIndex = state.breadcrumbs.findIndex(b => b.path === path);
+      
+      if (existingIndex >= 0) {
+        // Remove all breadcrumbs after this one
+        state.breadcrumbs = state.breadcrumbs.slice(0, existingIndex + 1);
+      } else {
+        state.breadcrumbs.push({ label, path, icon });
+      }
+    },
+    
+    // UI state
+    setSidebarOpen(open: boolean): void {
+      state.sidebarOpen = open;
+      persistState('navigationState', state);
+    },
+    
+    // File operations
+    toggleFileSelection(filePath: string): void {
+      const index = state.selectedFiles.indexOf(filePath);
+      if (index >= 0) {
+        state.selectedFiles.splice(index, 1);
+      } else {
+        state.selectedFiles.push(filePath);
+      }
+    },
+    
+    clearFileSelection(): void {
+      state.selectedFiles = [];
+    },
+    
+    // Directory operations
+    toggleDirectoryExpansion(dirPath: string): void {
+      const index = state.expandedDirectories.indexOf(dirPath);
+      if (index >= 0) {
+        state.expandedDirectories.splice(index, 1);
+      } else {
+        state.expandedDirectories.push(dirPath);
+      }
+    },
+    
+    // Scroll positions
+    saveScrollPosition(path: string, position: number): void {
+      state.scrollPositions.set(path, position);
+    },
+    
+    getScrollPosition(path: string): number {
+      return state.scrollPositions.get(path) || 0;
+    },
+    
+    clear(): void {
+      state = createDefaultNavigationState();
+      clearPersistedState('navigationState');
+    }
+  };
+})();
+
+export const searchState = (() => {
+  let state = $state<SearchState>(createDefaultSearchState());
+  
+  return {
+    get value() { return state; },
+    
+    // Search operations
+    setQuery(query: string): void {
+      state.query = query;
+    },
+    
+    setResults(results: SearchResult[]): void {
+      state.results = results;
+      state.isSearching = false;
+    },
+    
+    setSearching(isSearching: boolean): void {
+      state.isSearching = isSearching;
+    },
+    
+    // Filter operations
+    setFilters(filters: Partial<SearchState['filters']>): void {
+      state.filters = { ...state.filters, ...filters };
+      persistState('searchState', state);
+    },
+    
+    // Recent searches
+    addRecentSearch(query: string, resultCount: number): void {
+      if (query.trim().length < 2) return;
+      
+      // Remove existing entry
+      state.recentSearches = state.recentSearches.filter(s => s.query !== query);
+      
+      // Add to beginning
+      state.recentSearches.unshift({
+        query,
+        timestamp: new Date().toISOString(),
+        resultCount
+      });
+      
+      // Limit recent searches
+      state.recentSearches = state.recentSearches.slice(0, 20);
+      persistState('searchState', state);
+    },
+    
+    clearRecentSearches(): void {
+      state.recentSearches = [];
+      persistState('searchState', state);
+    },
+    
+    // Suggestions
+    setSuggestions(suggestions: string[]): void {
+      state.suggestions = suggestions;
+    },
+    
+    clear(): void {
+      state = createDefaultSearchState();
+      clearPersistedState('searchState');
+    }
+  };
+})();
+
+export const userPreferences = (() => {
+  let state = $state<UserPreferences>(DEFAULT_USER_PREFERENCES);
+  
+  return {
+    get value() { return state; },
+    
+    // Theme settings
+    setTheme(theme: UserPreferences['theme']): void {
+      state.theme = theme;
+      persistState('userPreferences', state);
+    },
+    
+    setLanguage(language: string): void {
+      state.language = language;
+      persistState('userPreferences', state);
+    },
+    
+    // Code editor preferences
+    setCodeEditorPrefs(prefs: Partial<UserPreferences['codeEditor']>): void {
+      state.codeEditor = { ...state.codeEditor, ...prefs };
+      persistState('userPreferences', state);
+    },
+    
+    // Analysis preferences
+    setAnalysisPrefs(prefs: Partial<UserPreferences['analysis']>): void {
+      state.analysis = { ...state.analysis, ...prefs };
+      persistState('userPreferences', state);
+    },
+    
+    // Notification preferences
+    setNotificationPrefs(prefs: Partial<UserPreferences['notifications']>): void {
+      state.notifications = { ...state.notifications, ...prefs };
+      persistState('userPreferences', state);
+    },
+    
+    // Documentation preferences
+    setDocumentationPrefs(prefs: Partial<UserPreferences['documentation']>): void {
+      state.documentation = { ...state.documentation, ...prefs };
+      persistState('userPreferences', state);
+    },
+    
+    // Navigation preferences
+    setNavigationPrefs(prefs: Partial<UserPreferences['navigation']>): void {
+      state.navigation = { ...state.navigation, ...prefs };
+      persistState('userPreferences', state);
+    },
+    
+    // Bulk operations
+    updatePreferences(prefs: Partial<UserPreferences>): void {
+      Object.assign(state, prefs);
+      persistState('userPreferences', state);
+    },
+    
+    resetToDefaults(): void {
+      state = { ...DEFAULT_USER_PREFERENCES };
+      persistState('userPreferences', state);
+    },
+    
+    clear(): void {
+      state = { ...DEFAULT_USER_PREFERENCES };
+      clearPersistedState('userPreferences');
+    }
+  };
+})();
+
+export const cacheManager = (() => {
+  let state = $state<CacheManager>(createDefaultCacheManager());
+  
+  return {
+    get value() { return state; },
+    
+    // Repository caching
+    cacheRepository(key: string, repo: FirestoreRepo, ttlHours: number = 24): void {
+      const entry: CacheEntry<FirestoreRepo> = {
+        data: repo,
+        timestamp: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + ttlHours * 60 * 60 * 1000).toISOString(),
+        version: '1.0.0',
+        size: JSON.stringify(repo).length
+      };
+      
+      state.repositories.set(key, entry);
+      state.currentSize += entry.size;
+      this.cleanup();
+      persistState('cacheManager', state);
+    },
+    
+    getRepository(key: string): FirestoreRepo | null {
+      const entry = state.repositories.get(key);
+      if (!entry) return null;
+      
+      // Check expiration
+      if (new Date(entry.expiresAt) < new Date()) {
+        state.repositories.delete(key);
+        state.currentSize -= entry.size;
+        return null;
+      }
+      
+      return entry.data;
+    },
+    
+    // Analysis caching
+    cacheAnalysis(key: string, analysis: AnalysisResult, ttlHours: number = 12): void {
+      const entry: CacheEntry<AnalysisResult> = {
+        data: analysis,
+        timestamp: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + ttlHours * 60 * 60 * 1000).toISOString(),
+        version: '1.0.0',
+        size: JSON.stringify(analysis).length
+      };
+      
+      state.analyses.set(key, entry);
+      state.currentSize += entry.size;
+      this.cleanup();
+      persistState('cacheManager', state);
+    },
+    
+    getAnalysis(key: string): AnalysisResult | null {
+      const entry = state.analyses.get(key);
+      if (!entry) return null;
+      
+      if (new Date(entry.expiresAt) < new Date()) {
+        state.analyses.delete(key);
+        state.currentSize -= entry.size;
+        return null;
+      }
+      
+      return entry.data;
+    },
+    
+    // AI description caching
+    cacheAIDescription(key: string, description: string, ttlHours: number = 48): void {
+      const entry: CacheEntry<string> = {
+        data: description,
+        timestamp: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + ttlHours * 60 * 60 * 1000).toISOString(),
+        version: '1.0.0',
+        size: description.length
+      };
+      
+      state.aiDescriptions.set(key, entry);
+      state.currentSize += entry.size;
+      this.cleanup();
+      persistState('cacheManager', state);
+    },
+    
+    getAIDescription(key: string): string | null {
+      const entry = state.aiDescriptions.get(key);
+      if (!entry) return null;
+      
+      if (new Date(entry.expiresAt) < new Date()) {
+        state.aiDescriptions.delete(key);
+        state.currentSize -= entry.size;
+        return null;
+      }
+      
+      return entry.data;
+    },
+    
+    // Cache management
+    cleanup(): void {
+      // Remove expired entries
+      this.removeExpired();
+      
+      // LRU eviction if over size limit
+      if (state.currentSize > state.maxSize) {
+        this.evictLRU();
+      }
+      
+      state.lastCleanup = new Date().toISOString();
+    },
+    
+    removeExpired(): void {
+      const now = new Date();
+      
+      // Clean repositories
+      for (const [key, entry] of state.repositories) {
+        if (new Date(entry.expiresAt) < now) {
+          state.repositories.delete(key);
+          state.currentSize -= entry.size;
+        }
+      }
+      
+      // Clean analyses
+      for (const [key, entry] of state.analyses) {
+        if (new Date(entry.expiresAt) < now) {
+          state.analyses.delete(key);
+          state.currentSize -= entry.size;
+        }
+      }
+      
+      // Clean AI descriptions
+      for (const [key, entry] of state.aiDescriptions) {
+        if (new Date(entry.expiresAt) < now) {
+          state.aiDescriptions.delete(key);
+          state.currentSize -= entry.size;
+        }
+      }
+    },
+    
+    evictLRU(): void {
+      // Collect all entries with timestamps
+      const allEntries: Array<{ key: string; timestamp: string; size: number; type: string }> = [];
+      
+      for (const [key, entry] of state.repositories) {
+        allEntries.push({ key, timestamp: entry.timestamp, size: entry.size, type: 'repository' });
+      }
+      
+      for (const [key, entry] of state.analyses) {
+        allEntries.push({ key, timestamp: entry.timestamp, size: entry.size, type: 'analysis' });
+      }
+      
+      for (const [key, entry] of state.aiDescriptions) {
+        allEntries.push({ key, timestamp: entry.timestamp, size: entry.size, type: 'description' });
+      }
+      
+      // Sort by timestamp (oldest first)
+      allEntries.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+      
+      // Remove oldest entries until under size limit
+      for (const entry of allEntries) {
+        if (state.currentSize <= state.maxSize * 0.8) break; // Leave some buffer
+        
+        switch (entry.type) {
+          case 'repository':
+            state.repositories.delete(entry.key);
+            break;
+          case 'analysis':
+            state.analyses.delete(entry.key);
+            break;
+          case 'description':
+            state.aiDescriptions.delete(entry.key);
+            break;
+        }
+        
+        state.currentSize -= entry.size;
+      }
+    },
+    
+    clear(): void {
+      state = createDefaultCacheManager();
+      clearPersistedState('cacheManager');
+    },
+    
+    // Statistics
+    getStats() {
+      return {
+        totalEntries: state.repositories.size + state.analyses.size + state.aiDescriptions.size,
+        currentSize: state.currentSize,
+        maxSize: state.maxSize,
+        utilizationPercent: Math.round((state.currentSize / state.maxSize) * 100),
+        repositories: state.repositories.size,
+        analyses: state.analyses.size,
+        aiDescriptions: state.aiDescriptions.size,
+        lastCleanup: state.lastCleanup
+      };
+    }
+  };
+})();
+
+// Validation functions
+function validateRepo(repo: FirestoreRepo): void {
+  if (!repo.id || !repo.fullName) {
+    throw new ValidationError('Repository must have id and fullName', 'repo', repo);
+  }
+}
+
+// Persistence utilities
+function persistState(key: string, data: any): void {
+  if (!browser) return;
+  
   try {
-    currentRepo.isLoading = true;
-    currentRepo.error = null;
+    const serialized = PERSISTENCE_CONFIG.serializer.serialize(data);
+    const storageKey = `${PERSISTENCE_CONFIG.key}_${key}`;
     
-    const firestoreRepo = await getRepoById(docId);
-    
-    if (firestoreRepo) {
-      setRepoFromFirestore(docId, firestoreRepo);
-    } else {
-      throw new Error('Repository not found');
+    if (PERSISTENCE_CONFIG.storage === 'localStorage') {
+      localStorage.setItem(storageKey, serialized);
+    } else if (PERSISTENCE_CONFIG.storage === 'sessionStorage') {
+      sessionStorage.setItem(storageKey, serialized);
     }
   } catch (error) {
-    currentRepo.error = error instanceof Error ? error.message : 'Failed to sync with database';
-    currentRepo.isLoading = false;
+    console.warn(`Failed to persist ${key}:`, error);
+    throw new PersistenceError(`Failed to persist ${key}`, 'save');
+  }
+}
+
+function loadPersistedState<T>(key: string, defaultValue: T): T {
+  if (!browser) return defaultValue;
+  
+  try {
+    const storageKey = `${PERSISTENCE_CONFIG.key}_${key}`;
+    let stored: string | null = null;
+    
+    if (PERSISTENCE_CONFIG.storage === 'localStorage') {
+      stored = localStorage.getItem(storageKey);
+    } else if (PERSISTENCE_CONFIG.storage === 'sessionStorage') {
+      stored = sessionStorage.getItem(storageKey);
+    }
+    
+    if (!stored) return defaultValue;
+    
+    return PERSISTENCE_CONFIG.serializer.deserialize(stored);
+  } catch (error) {
+    console.warn(`Failed to load persisted ${key}:`, error);
+    return defaultValue;
+  }
+}
+
+function clearPersistedState(key: string): void {
+  if (!browser) return;
+  
+  try {
+    const storageKey = `${PERSISTENCE_CONFIG.key}_${key}`;
+    
+    if (PERSISTENCE_CONFIG.storage === 'localStorage') {
+      localStorage.removeItem(storageKey);
+    } else if (PERSISTENCE_CONFIG.storage === 'sessionStorage') {
+      sessionStorage.removeItem(storageKey);
+    }
+  } catch (error) {
+    console.warn(`Failed to clear persisted ${key}:`, error);
+    throw new PersistenceError(`Failed to clear ${key}`, 'clear');
+  }
+}
+
+// Store initialization and utility functions
+
+/**
+ * Initialize all stores on app startup
+ */
+export function initializeStores(): void {
+  if (!browser) return;
+  
+  try {
+    // Load persisted state for all stores
+    const loadedRepo = loadPersistedState('currentRepo', createDefaultRepoState());
+    const loadedDocs = loadPersistedState('documentationData', createDefaultDocumentationData());
+    const loadedChat = loadPersistedState('chatHistory', createDefaultChatHistory());
+    const loadedNav = loadPersistedState('navigationState', createDefaultNavigationState());
+    const loadedSearch = loadPersistedState('searchState', createDefaultSearchState());
+    const loadedPrefs = loadPersistedState('userPreferences', DEFAULT_USER_PREFERENCES);
+    const loadedCache = loadPersistedState('cacheManager', createDefaultCacheManager());
+    
+    // Initialize stores with loaded data
+    Object.assign(currentRepo.value, loadedRepo);
+    Object.assign(documentationData.value, loadedDocs);
+    Object.assign(chatHistory.value, loadedChat);
+    Object.assign(navigationState.value, loadedNav);
+    Object.assign(searchState.value, loadedSearch);
+    Object.assign(userPreferences.value, loadedPrefs);
+    Object.assign(cacheManager.value, loadedCache);
+    
+    // Cleanup cache on startup
+    cacheManager.cleanup();
+    
+  } catch (error) {
+    console.warn('Failed to initialize stores:', error);
   }
 }
 
 /**
- * Clear current repository data
+ * Clear all store data (useful for logout or reset)
  */
-export function clearRepo(): void {
-  Object.assign(currentRepo, createDefaultRepoStore());
-  Object.assign(analysisStatus, createDefaultAnalysisStatus());
-  chatHistory.length = 0; // Clear array while maintaining reactivity
-  navigationState.repoDocId = null;
+export function clearAllStores(): void {
+  currentRepo.clear();
+  documentationData.clear();
+  chatHistory.clear();
+  navigationState.clear();
+  searchState.clear();
+  userPreferences.clear();
+  cacheManager.clear();
 }
 
-/**
- * Update analysis status during processing
- */
-export function updateAnalysisStatus(
-  isAnalyzing: boolean,
-  currentStep: string = '',
-  progress: number = 0,
-  error: string | null = null
-): void {
-  analysisStatus.isAnalyzing = isAnalyzing;
-  analysisStatus.currentStep = currentStep;
-  analysisStatus.progress = Math.min(100, Math.max(0, progress));
-  analysisStatus.error = error;
-  
-  if (!isAnalyzing && error) {
-    currentRepo.error = error;
-  }
-}
-
-/**
- * Add message to chat history
- */
-export function addChatMessage(
-  content: string,
-  role: 'user' | 'assistant',
-  metadata?: ChatMessage['metadata']
-): void {
-  const message: ChatMessage = {
-    id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-    sessionId: currentRepo.docId || 'no-session',
-    content,
-    role,
-    timestamp: new Date().toISOString(),
-    repoDocId: currentRepo.docId || undefined,
-    metadata
-  };
-  
-  chatHistory.push(message);
-  
-  // Persist to localStorage
-  if (browser && currentRepo.docId) {
-    persistChatHistory(currentRepo.docId, chatHistory);
-  }
-}
-
-/**
- * Clear chat history
- */
-export function clearChatHistory(): void {
-  chatHistory.length = 0;
-  
-  if (browser && currentRepo.docId) {
-    localStorage.removeItem(`repolens_chat_${currentRepo.docId}`);
-  }
-}
-
-/**
- * Update navigation state
- */
-export function updateNavigationState(
-  updates: Partial<NavigationState>
-): void {
-  Object.assign(navigationState, updates);
-  
-  // Persist navigation preferences
-  if (browser) {
-    persistNavigationPrefs();
-  }
-}
-
-/**
- * Add breadcrumb to navigation
- */
-export function addBreadcrumb(label: string, path: string): void {
-  const existingIndex = navigationState.breadcrumbs.findIndex(b => b.path === path);
-  
-  if (existingIndex >= 0) {
-    // Remove all breadcrumbs after this one
-    navigationState.breadcrumbs = navigationState.breadcrumbs.slice(0, existingIndex + 1);
-  } else {
-    navigationState.breadcrumbs.push({ label, path });
-  }
-}
-
-/**
- * Toggle file selection
- */
-export function toggleFileSelection(filePath: string): void {
-  const index = navigationState.selectedFiles.indexOf(filePath);
-  
-  if (index >= 0) {
-    navigationState.selectedFiles.splice(index, 1);
-  } else {
-    navigationState.selectedFiles.push(filePath);
-  }
-}
-
-/**
- * Toggle directory expansion
- */
-export function toggleDirectoryExpansion(dirPath: string): void {
-  const index = navigationState.expandedDirectories.indexOf(dirPath);
-  
-  if (index >= 0) {
-    navigationState.expandedDirectories.splice(index, 1);
-  } else {
-    navigationState.expandedDirectories.push(dirPath);
-  }
-}
-
-// Utility functions with full TypeScript support
-
-/**
- * Get current repository's Firestore document ID
- */
+// Legacy compatibility functions for existing code
 export function getRepoDocId(): string | null {
-  return currentRepo.docId;
+  return currentRepo.value.current?.id || null;
 }
 
-/**
- * Check if current repository has completed analysis
- */
 export function isRepoAnalyzed(): boolean {
-  return currentRepo.analysisStatus === 'completed' && currentRepo.analysisData !== null;
+  return currentRepo.value.analysis !== null;
 }
 
-/**
- * Get subsystem by name from current repository
- */
 export function getSubsystemByName(name: string): Subsystem | null {
-  if (!currentRepo.analysisData?.subsystems) {
-    return null;
-  }
+  const analysis = currentRepo.value.analysis;
+  if (!analysis?.subsystems) return null;
   
-  return currentRepo.analysisData.subsystems.find(subsystem => 
+  return analysis.subsystems.find(subsystem => 
     subsystem.name.toLowerCase() === name.toLowerCase()
   ) || null;
 }
 
-/**
- * Get all subsystems from current repository
- */
 export function getAllSubsystems(): Subsystem[] {
-  return currentRepo.analysisData?.subsystems || [];
+  return currentRepo.value.analysis?.subsystems || [];
 }
 
-/**
- * Get repository language distribution
- */
 export function getLanguageDistribution(): Record<string, number> {
-  return currentRepo.analysisData?.languages || {};
+  return currentRepo.value.analysis?.languages || {};
 }
 
-/**
- * Get total file count
- */
 export function getFileCount(): number {
-  return currentRepo.analysisData?.fileCount || 0;
+  return currentRepo.value.analysis?.fileCount || 0;
 }
 
-/**
- * Check if repository has specific framework
- */
 export function hasFramework(framework: string): boolean {
-  return currentRepo.analysisData?.framework.toLowerCase() === framework.toLowerCase();
-}
-
-// localStorage persistence functions
-
-/**
- * Cache recent repository for quick access
- */
-function cacheRecentRepo(docId: string, repoData: FirestoreRepo): void {
-  try {
-    const recent = getRecentReposFromStorage();
-    const repoInfo = {
-      docId,
-      fullName: repoData.fullName,
-      lastAccessed: new Date().toISOString()
-    };
-    
-    // Remove existing entry if present
-    const filtered = recent.filter(r => r.docId !== docId);
-    
-    // Add to beginning and limit to 10
-    const updated = [repoInfo, ...filtered].slice(0, 10);
-    
-    localStorage.setItem(STORAGE_KEYS.RECENT_REPOS, JSON.stringify(updated));
-  } catch (error) {
-    console.warn('Failed to cache recent repository:', error);
-  }
-}
-
-/**
- * Get recent repositories from localStorage
- */
-function getRecentReposFromStorage(): Array<{docId: string; fullName: string; lastAccessed: string}> {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEYS.RECENT_REPOS);
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-}
-
-/**
- * Persist chat history to localStorage
- */
-function persistChatHistory(docId: string, messages: ChatMessage[]): void {
-  try {
-    localStorage.setItem(`repolens_chat_${docId}`, JSON.stringify(messages));
-  } catch (error) {
-    console.warn('Failed to persist chat history:', error);
-  }
-}
-
-/**
- * Load chat history from localStorage
- */
-export function loadChatHistory(docId: string): void {
-  if (!browser) return;
-  
-  try {
-    const stored = localStorage.getItem(`repolens_chat_${docId}`);
-    if (stored) {
-      const messages = JSON.parse(stored) as ChatMessage[];
-      chatHistory.length = 0;
-      chatHistory.push(...messages);
-    }
-  } catch (error) {
-    console.warn('Failed to load chat history:', error);
-  }
-}
-
-/**
- * Persist navigation preferences
- */
-function persistNavigationPrefs(): void {
-  try {
-    const prefs = {
-      sidebarOpen: navigationState.sidebarOpen,
-      expandedDirectories: navigationState.expandedDirectories
-    };
-    localStorage.setItem(STORAGE_KEYS.NAVIGATION_PREFS, JSON.stringify(prefs));
-  } catch (error) {
-    console.warn('Failed to persist navigation preferences:', error);
-  }
-}
-
-/**
- * Load navigation preferences from localStorage
- */
-export function loadNavigationPrefs(): void {
-  if (!browser) return;
-  
-  try {
-    const stored = localStorage.getItem(STORAGE_KEYS.NAVIGATION_PREFS);
-    if (stored) {
-      const prefs = JSON.parse(stored);
-      navigationState.sidebarOpen = prefs.sidebarOpen ?? false;
-      navigationState.expandedDirectories = prefs.expandedDirectories ?? [];
-    }
-  } catch (error) {
-    console.warn('Failed to load navigation preferences:', error);
-  }
-}
-
-/**
- * Get cached recent repositories for quick access
- */
-export function getCachedRecentRepos(): Array<{docId: string; fullName: string; lastAccessed: string}> {
-  if (!browser) return [];
-  return getRecentReposFromStorage();
-}
-
-/**
- * Initialize stores on app startup
- */
-export function initializeStores(): void {
-  if (browser) {
-    loadNavigationPrefs();
-  }
+  const currentFramework = currentRepo.value.analysis?.framework;
+  return currentFramework?.toLowerCase() === framework.toLowerCase();
 }
