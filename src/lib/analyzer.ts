@@ -1,40 +1,56 @@
-import type { RepoData, GitHubFile, Framework, Subsystem, SubsystemPattern, AnalysisResult, RepoVersion } from './types';
+import type {
+  RepoData,
+  GitHubFile,
+  Framework,
+  Subsystem,
+  SubsystemPattern,
+  AnalysisResult,
+  RepoVersion,
+  SubsystemDescription,
+  FileInterface,
+  CitationLink,
+  OpenAIResponse
+} from './types';
+
+// OpenAI integration for enhanced documentation
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
+const OPENAI_BASE_URL = 'https://api.openai.com/v1';
 
 /**
  * Detects the framework used in a repository based on file patterns and dependencies
  */
 export function detectFramework(repoData: RepoData, files: GitHubFile[]): Framework {
   const filePaths = files.map(f => f.path.toLowerCase());
-  
+
   // Check for Next.js first (more specific than React)
-  if (filePaths.some(path => path.includes('next.config.js') || path.includes('next.config.ts') || 
+  if (filePaths.some(path => path.includes('next.config.js') || path.includes('next.config.ts') ||
                             path.includes('next.config.mjs') || path.includes('next.config.cjs'))) {
     return 'nextjs';
   }
-  
+
   // Check for pages or app directory structure (Next.js)
   if (filePaths.some(path => path.startsWith('pages/') || path.startsWith('app/')) &&
       filePaths.some(path => path.includes('package.json'))) {
     return 'nextjs';
   }
-  
+
   // Check for React
   if (filePaths.some(path => path.includes('package.json'))) {
     // We'll assume React if we find JSX/TSX files and package.json
-    const hasReactFiles = filePaths.some(path => 
+    const hasReactFiles = filePaths.some(path =>
       path.endsWith('.jsx') || path.endsWith('.tsx')
     );
     if (hasReactFiles) {
       return 'react';
     }
   }
-  
+
   // Check for Svelte
   if (filePaths.some(path => path.endsWith('.svelte')) ||
       filePaths.some(path => path.includes('svelte.config.js') || path.includes('svelte.config.ts'))) {
     return 'svelte';
   }
-  
+
   // Check for Flask
   if (filePaths.some(path => path.includes('app.py') || path.includes('wsgi.py')) ||
       filePaths.some(path => path.includes('requirements.txt') || path.includes('pyproject.toml'))) {
@@ -46,13 +62,13 @@ export function detectFramework(repoData: RepoData, files: GitHubFile[]): Framew
       }
     }
   }
-  
+
   // Check for FastAPI
   if (filePaths.some(path => path.includes('main.py')) &&
       filePaths.some(path => path.includes('requirements.txt') || path.includes('pyproject.toml'))) {
     return 'fastapi';
   }
-  
+
   return 'unknown';
 }
 
@@ -283,29 +299,29 @@ export function categorizeFiles(files: GitHubFile[], framework: Framework): Subs
   const patterns = FRAMEWORK_PATTERNS[framework] || [];
   const subsystems: Subsystem[] = [];
   const categorizedFiles = new Set<string>();
-  
+
   // Sort patterns by priority to ensure more specific patterns are matched first
   const sortedPatterns = [...patterns].sort((a, b) => a.priority - b.priority);
-  
+
   for (const pattern of sortedPatterns) {
     const matchingFiles = files.filter(file => {
       // Skip if already categorized
       if (categorizedFiles.has(file.path)) {
         return false;
       }
-      
+
       // Check if file matches any of the path patterns
-      const pathMatches = pattern.patterns.some(p => 
+      const pathMatches = pattern.patterns.some(p =>
         file.path.toLowerCase().includes(p.toLowerCase())
       );
-      
+
       // Check if file has matching extension (if specified)
-      const extensionMatches = !pattern.extensions || 
+      const extensionMatches = !pattern.extensions ||
         pattern.extensions.some(ext => file.path.toLowerCase().endsWith(ext));
-      
+
       return pathMatches && extensionMatches && file.type === 'blob';
     });
-    
+
     if (matchingFiles.length > 0) {
       subsystems.push({
         name: pattern.name,
@@ -313,17 +329,17 @@ export function categorizeFiles(files: GitHubFile[], framework: Framework): Subs
         files: matchingFiles,
         pattern: pattern.patterns.join(', ')
       });
-      
+
       // Mark files as categorized
       matchingFiles.forEach(file => categorizedFiles.add(file.path));
     }
   }
-  
+
   // Add uncategorized files to a general subsystem if any exist
-  const uncategorizedFiles = files.filter(file => 
+  const uncategorizedFiles = files.filter(file =>
     !categorizedFiles.has(file.path) && file.type === 'blob'
   );
-  
+
   if (uncategorizedFiles.length > 0) {
     subsystems.push({
       name: 'Other',
@@ -332,7 +348,7 @@ export function categorizeFiles(files: GitHubFile[], framework: Framework): Subs
       pattern: 'Various paths'
     });
   }
-  
+
   return subsystems;
 }
 
@@ -342,10 +358,10 @@ export function categorizeFiles(files: GitHubFile[], framework: Framework): Subs
 export function analyzeRepo(repoData: RepoData, files: GitHubFile[]): AnalysisResult {
   // Detect framework
   const framework = detectFramework(repoData, files);
-  
+
   // Categorize files into subsystems
   const subsystems = categorizeFiles(files, framework);
-  
+
   // Calculate language distribution
   const languages: Record<string, number> = {};
   files.forEach(file => {
@@ -356,7 +372,7 @@ export function analyzeRepo(repoData: RepoData, files: GitHubFile[]): AnalysisRe
         const languageMap: Record<string, string> = {
           'js': 'JavaScript',
           'jsx': 'JavaScript',
-          'ts': 'TypeScript', 
+          'ts': 'TypeScript',
           'tsx': 'TypeScript',
           'py': 'Python',
           'svelte': 'Svelte',
@@ -368,35 +384,35 @@ export function analyzeRepo(repoData: RepoData, files: GitHubFile[]): AnalysisRe
           'yml': 'YAML',
           'yaml': 'YAML'
         };
-        
+
         const language = languageMap[extension] || extension.toUpperCase();
         languages[language] = (languages[language] || 0) + (file.size || 0);
       }
     }
   });
-  
+
   // Categorize special files
-  const mainFiles = files.filter(file => 
+  const mainFiles = files.filter(file =>
     ['readme.md', 'index.js', 'index.ts', 'main.py', 'app.py', 'index.html', 'package.json'].includes(file.path.toLowerCase())
   );
-  
+
   const configFiles = files.filter(file => {
     const path = file.path.toLowerCase();
     return path.includes('config') || path.endsWith('.config.js') || path.endsWith('.config.ts') ||
-           path.includes('package.json') || path.includes('requirements.txt') || 
+           path.includes('package.json') || path.includes('requirements.txt') ||
            path.includes('pyproject.toml') || path.includes('.env') || path.includes('dockerfile');
   });
-  
+
   const documentationFiles = files.filter(file => {
     const path = file.path.toLowerCase();
     return path.endsWith('.md') || path.includes('docs/') || path.includes('documentation/');
   });
-  
+
   const testFiles = files.filter(file => {
     const path = file.path.toLowerCase();
     return path.includes('test') || path.includes('spec') || path.includes('__tests__/');
   });
-  
+
   // Create version info
   const version: RepoVersion = {
     pushedAt: repoData.pushed_at,
@@ -404,7 +420,7 @@ export function analyzeRepo(repoData: RepoData, files: GitHubFile[]): AnalysisRe
     defaultBranch: repoData.default_branch,
     fileTreeSha: 'current' // This would be set by the calling function
   };
-  
+
   return {
     metadata: repoData,
     fileTree: files,
@@ -419,4 +435,313 @@ export function analyzeRepo(repoData: RepoData, files: GitHubFile[]): AnalysisRe
     documentationFiles,
     testFiles
   };
+}
+
+/**
+ * Makes a request to OpenAI API with proper error handling
+ */
+async function makeOpenAIRequest(prompt: string, model: string = 'gpt-4o-mini'): Promise<OpenAIResponse> {
+  if (!OPENAI_API_KEY) {
+    return {
+      success: false,
+      error: 'OpenAI API key not configured'
+    };
+  }
+
+  try {
+    const response = await fetch(`${OPENAI_BASE_URL}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful assistant that analyzes code repositories and provides concise, accurate documentation.'
+          },
+          {
+            role: 'user',
+            content: prompt
+          }
+        ],
+        max_tokens: 1000,
+        temperature: 0.3
+      })
+    });
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: `OpenAI API error: ${response.status} ${response.statusText}`
+      };
+    }
+
+    const data = await response.json();
+
+    return {
+      success: true,
+      data: data.choices[0]?.message?.content || '',
+      usage: {
+        promptTokens: data.usage?.prompt_tokens || 0,
+        completionTokens: data.usage?.completion_tokens || 0,
+        totalTokens: data.usage?.total_tokens || 0
+      }
+    };
+  } catch (error) {
+    return {
+      success: false,
+      error: `OpenAI request failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+    };
+  }
+}
+
+/**
+ * Generates AI-powered description for a subsystem using OpenAI
+ */
+export async function generateSubsystemDescription(
+  subsystemName: string,
+  files: GitHubFile[],
+  repoContext: AnalysisResult
+): Promise<SubsystemDescription> {
+  const fileList = files.slice(0, 10).map(f => f.path).join('\n');
+  const framework = repoContext.framework;
+  const repoName = repoContext.metadata.full_name;
+
+  const prompt = `Analyze this ${subsystemName} subsystem in a ${framework} repository called "${repoName}".
+
+Files in this subsystem:
+${fileList}
+
+Repository context:
+- Main language: ${repoContext.metadata.language || 'Mixed'}
+- Framework: ${framework}
+- Total files: ${repoContext.fileCount}
+
+Please provide a concise analysis in this JSON format:
+{
+  "description": "Brief description of what this subsystem does",
+  "purpose": "Main purpose and responsibility",
+  "keyFiles": ["array", "of", "most", "important", "files"],
+  "entryPoints": ["main", "entry", "points"],
+  "technologies": ["relevant", "technologies", "used"],
+  "dependencies": ["key", "dependencies"]
+}
+
+Keep descriptions concise and focus on practical information for developers.`;
+
+  const response = await makeOpenAIRequest(prompt);
+
+  if (!response.success || !response.data) {
+    // Fallback to basic analysis if OpenAI fails
+    return {
+      name: subsystemName,
+      description: `${subsystemName} files and components`,
+      keyFiles: files.slice(0, 5).map(f => f.path),
+      entryPoints: files.filter(f =>
+        f.path.includes('index') || f.path.includes('main') || f.path.includes('app')
+      ).map(f => f.path),
+      purpose: `Handles ${subsystemName.toLowerCase()} functionality`,
+      technologies: [framework],
+      dependencies: []
+    };
+  }
+
+  try {
+    const parsed = JSON.parse(response.data);
+    return {
+      name: subsystemName,
+      description: parsed.description || `${subsystemName} files and components`,
+      keyFiles: parsed.keyFiles || files.slice(0, 5).map(f => f.path),
+      entryPoints: parsed.entryPoints || [],
+      purpose: parsed.purpose || `Handles ${subsystemName.toLowerCase()} functionality`,
+      technologies: parsed.technologies || [framework],
+      dependencies: parsed.dependencies || []
+    };
+  } catch (parseError) {
+    console.warn('Failed to parse OpenAI response, using fallback', parseError);
+    return {
+      name: subsystemName,
+      description: `${subsystemName} files and components`,
+      keyFiles: files.slice(0, 5).map(f => f.path),
+      entryPoints: [],
+      purpose: `Handles ${subsystemName.toLowerCase()} functionality`,
+      technologies: [framework],
+      dependencies: []
+    };
+  }
+}
+
+/**
+ * Extracts key interfaces and exports from files using regex patterns
+ */
+export async function extractKeyInterfaces(files: GitHubFile[] | (GitHubFile & { content?: string })[]): Promise<FileInterface[]> {
+  const interfaces: FileInterface[] = [];
+
+  // Patterns for different file types
+  const patterns = {
+    typescript: {
+      function: /export\s+(async\s+)?function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\([^)]*\)/g,
+      class: /export\s+class\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/g,
+      interface: /export\s+interface\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/g,
+      type: /export\s+type\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/g,
+      const: /export\s+const\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/g
+    },
+    javascript: {
+      function: /export\s+(async\s+)?function\s+([a-zA-Z_$][a-zA-Z0-9_$]*)\s*\([^)]*\)/g,
+      class: /export\s+class\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/g,
+      const: /export\s+const\s+([a-zA-Z_$][a-zA-Z0-9_$]*)/g
+    },
+    python: {
+      function: /def\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/g,
+      class: /class\s+([a-zA-Z_][a-zA-Z0-9_]*)/g
+    },
+    svelte: {
+      component: /<script[^>]*>([\s\S]*?)<\/script>/g
+    }
+  };
+
+  for (const file of files.slice(0, 20)) { // Limit to first 20 files for performance
+    // Type guard to check if file has content property
+    const fileWithContent = file as GitHubFile & { content?: string };
+    if (!fileWithContent.content || file.type !== 'blob') continue;
+
+    const extension = file.path.split('.').pop()?.toLowerCase();
+    let filePatterns: any = {};
+
+    switch (extension) {
+      case 'ts':
+      case 'tsx':
+        filePatterns = patterns.typescript;
+        break;
+      case 'js':
+      case 'jsx':
+        filePatterns = patterns.javascript;
+        break;
+      case 'py':
+        filePatterns = patterns.python;
+        break;
+      case 'svelte':
+        filePatterns = patterns.svelte;
+        break;
+      default:
+        continue;
+    }
+
+    const content = fileWithContent.content;
+    const lines = content.split('\n');
+
+    for (const [type, pattern] of Object.entries(filePatterns)) {
+      const regex = pattern as RegExp;
+      let match;
+
+      while ((match = regex.exec(content)) !== null) {
+        const name = match[2] || match[1]; // Different capture groups for different patterns
+        if (!name) continue;
+
+        // Find line number
+        const matchIndex = match.index || 0;
+        const lineNumber = content.substring(0, matchIndex).split('\n').length;
+
+        interfaces.push({
+          filePath: file.path,
+          type: type as any,
+          name,
+          signature: match[0],
+          visibility: 'public', // Default to public for exports
+          lineNumber
+        });
+      }
+    }
+  }
+
+  return interfaces;
+}
+
+/**
+ * Generates GitHub citation links for files and line references
+ */
+export function generateInlineCitations(
+  filePath: string,
+  repoOwner: string,
+  repoName: string,
+  lineNumber?: number,
+  context?: string
+): CitationLink {
+  const baseUrl = `https://github.com/${repoOwner}/${repoName}/blob/main/${filePath}`;
+  const urlWithLine = lineNumber ? `${baseUrl}#L${lineNumber}` : baseUrl;
+
+  const displayText = lineNumber
+    ? `${filePath}:${lineNumber}`
+    : filePath;
+
+  return {
+    type: lineNumber ? 'line' : 'file',
+    url: urlWithLine,
+    displayText,
+    filePath,
+    lineNumber,
+    context
+  };
+}
+
+/**
+ * Enhanced main analysis function with AI integration and full TypeScript support
+ */
+export async function analyzeRepoWithAI(repoData: RepoData, files: GitHubFile[] | (GitHubFile & { content?: string })[]): Promise<AnalysisResult> {
+  // Get basic analysis first
+  const basicAnalysis = analyzeRepo(repoData, files);
+
+  try {
+    // Generate AI descriptions for each subsystem
+    const subsystemDescriptions: SubsystemDescription[] = [];
+    for (const subsystem of basicAnalysis.subsystems) {
+      const description = await generateSubsystemDescription(
+        subsystem.name,
+        subsystem.files,
+        basicAnalysis
+      );
+      subsystemDescriptions.push(description);
+    }
+
+    // Extract key interfaces and exports
+    const keyInterfaces = await extractKeyInterfaces(files);
+
+    // Generate citations for important files
+    const citations: CitationLink[] = [];
+    const importantFiles = [
+      ...basicAnalysis.mainFiles,
+      ...basicAnalysis.configFiles.slice(0, 3),
+      ...basicAnalysis.documentationFiles.slice(0, 3)
+    ];
+
+    const [owner, repo] = repoData.full_name.split('/');
+    for (const file of importantFiles) {
+      citations.push(generateInlineCitations(file.path, owner, repo));
+    }
+
+    // Add interface citations
+    for (const iface of keyInterfaces.slice(0, 10)) {
+      citations.push(generateInlineCitations(
+        iface.filePath,
+        owner,
+        repo,
+        iface.lineNumber,
+        `${iface.type}: ${iface.name}`
+      ));
+    }
+
+    return {
+      ...basicAnalysis,
+      subsystemDescriptions,
+      keyInterfaces,
+      citations
+    };
+
+  } catch (error) {
+    console.warn('AI analysis failed, returning basic analysis:', error);
+    return basicAnalysis;
+  }
 }

@@ -380,6 +380,53 @@ export interface SubsystemPattern {
   priority: number;
 }
 
+// Enhanced subsystem types for OpenAI integration
+export interface SubsystemDescription {
+  name: string;
+  description: string;
+  keyFiles: string[];
+  entryPoints: string[];
+  purpose: string;
+  technologies: string[];
+  dependencies: string[];
+}
+
+export interface FileInterface {
+  filePath: string;
+  type: 'function' | 'class' | 'component' | 'constant' | 'type' | 'interface';
+  name: string;
+  signature?: string;
+  description?: string;
+  parameters?: Array<{
+    name: string;
+    type: string;
+    optional?: boolean;
+  }>;
+  returnType?: string;
+  visibility: 'public' | 'private' | 'protected';
+  lineNumber?: number;
+}
+
+export interface CitationLink {
+  type: 'file' | 'line' | 'function' | 'class';
+  url: string;
+  displayText: string;
+  filePath: string;
+  lineNumber?: number;
+  context?: string;
+}
+
+export interface OpenAIResponse {
+  success: boolean;
+  data?: any;
+  error?: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+
 // Updated AnalysisResult with framework and subsystems
 export interface AnalysisResult {
   metadata: RepoData;
@@ -394,6 +441,10 @@ export interface AnalysisResult {
   configFiles: GitHubFile[];
   documentationFiles: GitHubFile[];
   testFiles: GitHubFile[];
+  // Enhanced documentation fields
+  subsystemDescriptions?: SubsystemDescription[];
+  keyInterfaces?: FileInterface[];
+  citations?: CitationLink[];
 }
 
 export interface RepoVersion {

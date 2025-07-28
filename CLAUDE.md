@@ -18,7 +18,7 @@ RepoLens is a SvelteKit web application that provides a clear view of any codeba
 - `npm run test:unit` - Run Vitest unit tests
 
 ### Code Quality
-- `npm run lint` - Run ESLint for code linting 
+- `npm run lint` - Run ESLint for code linting
 - `npm run check` - Run Svelte type checking with TypeScript
 - `npm run check:watch` - Run type checking in watch mode
 
@@ -71,7 +71,7 @@ RepoLens is a SvelteKit web application that provides a clear view of any codeba
 
 ### Required Public Variables (Firebase)
 - `PUBLIC_FIREBASE_API_KEY`
-- `PUBLIC_FIREBASE_AUTH_DOMAIN` 
+- `PUBLIC_FIREBASE_AUTH_DOMAIN`
 - `PUBLIC_FIREBASE_PROJECT_ID`
 - `PUBLIC_FIREBASE_STORAGE_BUCKET`
 - `PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
@@ -79,11 +79,7 @@ RepoLens is a SvelteKit web application that provides a clear view of any codeba
 - `PUBLIC_FIREBASE_MEASUREMENT_ID`
 
 ### Required Private Variables (AI)
-- `ANTHROPIC_API_KEY`
-- `GOOGLE_GENERATIVE_AI_API_KEY`
-
-### Optional Variables
-- `PUBLIC_USE_AI_PARSER` - Enable/disable AI item parsing
+- `OPENAI_API_KEY`
 
 ## Build and Deployment
 
