@@ -1,164 +1,210 @@
 import type { Firestore as FirestoreType } from 'firebase/firestore';
 
-import type { RepoData, AnalysisResult } from '../types';
-import type { StoredRepository, StoredRepositoryFirestore } from '$types/repository';
-
-import { getFirestore, doc, getDocs, collection, query, where, orderBy, limit, setDoc, updateDoc, Timestamp as FirestoreTimestamp } from 'firebase/firestore';
+import { 
+  getFirestore, 
+  doc, 
+  getDoc,
+  getDocs, 
+  collection, 
+  query, 
+  where, 
+  orderBy, 
+  limit, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc,
+  Timestamp as FirestoreTimestamp,
+  QueryConstraint
+} from 'firebase/firestore';
+import type { DocumentData } from 'firebase/firestore';
 import { createId } from 'briznads-helpers';
 
 import { firebase } from '$services/firebase';
 
-
+/**
+ * Generic Firestore service providing CRUD operations for any collection
+ */
 class Firestore {
 	private db : FirestoreType;
-
 
 	constructor() {
 		this.db = getFirestore(firebase.app);
 	}
 
-
-
-	// Repository-related methods
-	private readonly REPOSITORIES_COLLECTION = 'repositories';
-
 	/**
-	 * Check if a repository exists by URL
+	 * Create a new document with auto-generated ID
 	 */
-	async checkRepository(repoUrl: string): Promise<StoredRepository | null> {
-		const q = query(
-			collection(this.db, this.REPOSITORIES_COLLECTION),
-			where('url', '==', repoUrl),
-			limit(1)
-		);
-
-		try {
-			const querySnapshot = await getDocs(q);
-
-			if (querySnapshot.empty) {
-				return null;
-			}
-
-			const doc = querySnapshot.docs[0];
-			const data = doc.data() as StoredRepositoryFirestore;
-			return {
-				id: doc.id,
-				...data,
-				createdAt: data.createdAt.toDate(),
-				updatedAt: data.updatedAt.toDate(),
-				lastAnalyzed: data.lastAnalyzed.toDate()
-			} as StoredRepository;
-		} catch (error) {
-			console.error(`Something went wrong when attempting to check repository ${repoUrl}:`, error);
-			return null;
-		}
-	}
-
-	/**
-	 * Store a new repository analysis
-	 */
-	async storeRepository(
-		owner: string,
-		name: string,
-		repoData: RepoData,
-		analysisResult: AnalysisResult,
-		status: 'analyzing' | 'completed' | 'failed' = 'completed',
-		error?: string
+	async create<T extends DocumentData>(
+		collectionName: string, 
+		data: T, 
+		customId?: string
 	): Promise<string> {
-		const repoId = createId('lowercase', 9);
-		const now = FirestoreTimestamp.now();
-
-		const storedRepo: StoredRepositoryFirestore = {
-			owner,
-			name,
-			fullName: repoData.full_name,
-			url: repoData.html_url,
-			description: repoData.description,
-			language: repoData.language,
-			stars: repoData.stargazers_count,
-			forks: repoData.forks_count,
-			createdAt: FirestoreTimestamp.fromDate(new Date(repoData.created_at)),
-			updatedAt: FirestoreTimestamp.fromDate(new Date(repoData.updated_at)),
-			lastAnalyzed: now,
-			analysisVersion: '1.0.0',
-			data: analysisResult,
-			status,
-			error
-		};
-
-		const docRef = doc(this.db, this.REPOSITORIES_COLLECTION, repoId);
+		const docId = customId || createId('lowercase', 9);
+		const docRef = doc(this.db, collectionName, docId);
 
 		try {
-			await setDoc(docRef, storedRepo);
-			return repoId;
+			await setDoc(docRef, {
+				...data,
+				createdAt: FirestoreTimestamp.now(),
+				updatedAt: FirestoreTimestamp.now()
+			});
+			return docId;
 		} catch (error) {
-			console.error(`Something went wrong when attempting to store repository ${repoId}:`, error);
+			console.error(`Error creating document in ${collectionName}:`, error);
 			throw error;
 		}
 	}
 
 	/**
-	 * Update repository status
+	 * Get a document by ID
 	 */
-	async updateRepositoryStatus(
-		repoId: string,
-		status: 'analyzing' | 'completed' | 'failed',
-		error?: string
-	): Promise<void> {
-		const docRef = doc(this.db, this.REPOSITORIES_COLLECTION, repoId);
-		const updates: any = {
-			status,
-			lastAnalyzed: FirestoreTimestamp.now()
-		};
-
-		if (error) {
-			updates.error = error;
-		}
+	async getById<T extends DocumentData>(
+		collectionName: string, 
+		docId: string
+	): Promise<T | null> {
+		const docRef = doc(this.db, collectionName, docId);
 
 		try {
-			await updateDoc(docRef, updates);
-		} catch (updateError) {
-			console.error(`Something went wrong when attempting to update repository status for ${repoId}:`, updateError);
-			throw updateError;
+			const docSnap = await getDoc(docRef);
+			
+			if (!docSnap.exists()) {
+				return null;
+			}
+
+			return {
+				id: docSnap.id,
+				...docSnap.data()
+			} as unknown as T;
+		} catch (error) {
+			console.error(`Error getting document ${docId} from ${collectionName}:`, error);
+			return null;
 		}
 	}
 
 	/**
-	 * Get recent repositories
+	 * Update a document by ID
 	 */
-	async getRecentRepositories(limitCount: number = 10): Promise<StoredRepository[]> {
-		const q = query(
-			collection(this.db, this.REPOSITORIES_COLLECTION),
-			where('status', '==', 'completed'),
-			orderBy('lastAnalyzed', 'desc'),
-			limit(limitCount)
-		);
+	async update<T extends Partial<DocumentData>>(
+		collectionName: string, 
+		docId: string, 
+		updates: T
+	): Promise<void> {
+		const docRef = doc(this.db, collectionName, docId);
+
+		try {
+			await updateDoc(docRef, {
+				...updates,
+				updatedAt: FirestoreTimestamp.now()
+			});
+		} catch (error) {
+			console.error(`Error updating document ${docId} in ${collectionName}:`, error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Delete a document by ID
+	 */
+	async delete(collectionName: string, docId: string): Promise<void> {
+		const docRef = doc(this.db, collectionName, docId);
+
+		try {
+			await deleteDoc(docRef);
+		} catch (error) {
+			console.error(`Error deleting document ${docId} from ${collectionName}:`, error);
+			throw error;
+		}
+	}
+
+	/**
+	 * Query documents with filters
+	 */
+	async query<T extends DocumentData>(
+		collectionName: string,
+		constraints: QueryConstraint[] = []
+	): Promise<T[]> {
+		const q = query(collection(this.db, collectionName), ...constraints);
 
 		try {
 			const querySnapshot = await getDocs(q);
-			return querySnapshot.docs.map(doc => {
-				const data = doc.data() as StoredRepositoryFirestore;
-				return {
-					id: doc.id,
-					...data,
-					createdAt: data.createdAt.toDate(),
-					updatedAt: data.updatedAt.toDate(),
-					lastAnalyzed: data.lastAnalyzed.toDate()
-				} as StoredRepository;
-			});
+			return querySnapshot.docs.map(doc => ({
+				id: doc.id,
+				...doc.data()
+			} as unknown as T));
 		} catch (error) {
-			console.error('Something went wrong when attempting to get recent repositories:', error);
+			console.error(`Error querying ${collectionName}:`, error);
 			return [];
 		}
 	}
 
 	/**
-	 * Check if repository needs refresh (older than 24 hours)
+	 * Find first document matching conditions
 	 */
-	isRepositoryStale(repo: StoredRepository): boolean {
-		const oneDayAgo = new Date();
-		oneDayAgo.setDate(oneDayAgo.getDate() - 1);
-		return repo.lastAnalyzed < oneDayAgo;
+	async findOne<T extends DocumentData>(
+		collectionName: string,
+		field: string,
+		value: any
+	): Promise<T | null> {
+		const q = query(
+			collection(this.db, collectionName),
+			where(field, '==', value),
+			limit(1)
+		);
+
+		try {
+			const querySnapshot = await getDocs(q);
+			
+			if (querySnapshot.empty) {
+				return null;
+			}
+
+			const doc = querySnapshot.docs[0];
+			return {
+				id: doc.id,
+				...doc.data()
+			} as unknown as T;
+		} catch (error) {
+			console.error(`Error finding document in ${collectionName}:`, error);
+			return null;
+		}
+	}
+
+	/**
+	 * Find multiple documents matching conditions
+	 */
+	async findMany<T extends DocumentData>(
+		collectionName: string,
+		field: string,
+		value: any,
+		limitCount?: number,
+		orderByField?: string,
+		orderDirection: 'asc' | 'desc' = 'desc'
+	): Promise<T[]> {
+		const constraints: QueryConstraint[] = [where(field, '==', value)];
+		
+		if (orderByField) {
+			constraints.push(orderBy(orderByField, orderDirection));
+		}
+		
+		if (limitCount) {
+			constraints.push(limit(limitCount));
+		}
+
+		return this.query<T>(collectionName, constraints);
+	}
+
+	/**
+	 * Get Firestore Timestamp utility
+	 */
+	static timestamp() {
+		return FirestoreTimestamp;
+	}
+
+	/**
+	 * Get current timestamp
+	 */
+	static now() {
+		return FirestoreTimestamp.now();
 	}
 }
 
