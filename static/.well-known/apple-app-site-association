@@ -1,0 +1,23 @@
+{
+  "applinks": {
+      "details": [
+           {
+             "appIDs": [ "NX3KW4TAA8.com.beautifuluniquesnowflake.cartmigo" ],
+             "components": [
+               {
+                  "#": "no_universal_links",
+                  "exclude": true,
+                  "comment": "Matches any URL with a fragment that equals no_universal_links and instructs the system not to open it as a universal link."
+               },
+               {
+                  "/": "*",
+                  "comment": "Matches all URLs."
+               }
+             ]
+           }
+       ]
+   },
+   "webcredentials": {
+      "apps": [ "NX3KW4TAA8.com.beautifuluniquesnowflake.cartmigo" ]
+   }
+}
