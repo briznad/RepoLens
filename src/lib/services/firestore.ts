@@ -3,7 +3,8 @@ import type { Firestore as FirestoreType } from 'firebase/firestore';
 import type { RepoData, AnalysisResult } from '../types';
 import type { StoredRepository, StoredRepositoryFirestore } from '$types/repository';
 
-import { getFirestore, doc, getDocs, getDoc, collection, query, where, orderBy, limit, setDoc, updateDoc, Timestamp as FirestoreTimestamp } from 'firebase/firestore';
+import { getFirestore, doc, getDocs, collection, query, where, orderBy, limit, setDoc, updateDoc, Timestamp as FirestoreTimestamp } from 'firebase/firestore';
+import { createId } from 'briznads-helpers';
 
 import { firebase } from '$services/firebase';
 
@@ -22,48 +23,33 @@ class Firestore {
 	private readonly REPOSITORIES_COLLECTION = 'repositories';
 
 	/**
-	 * Generate a repository ID from owner and name
-	 * Uses double dash separator instead of forward slash to avoid Firestore path issues
+	 * Check if a repository exists by URL
 	 */
-	generateRepoId(owner: string, name: string): string {
-		return `${owner}--${name}`.toLowerCase();
-	}
-
-	/**
-	 * Parse a repository ID back to owner and name
-	 */
-	parseRepoId(repoId: string): { owner: string; name: string } {
-		const [owner, name] = repoId.split('--');
-		if (!owner || !name) {
-			throw new Error(`Invalid repository ID format: ${repoId}`);
-		}
-		return { owner, name };
-	}
-
-	/**
-	 * Check if a repository exists and is fresh
-	 */
-	async checkRepository(owner: string, name: string): Promise<StoredRepository | null> {
-		const repoId = this.generateRepoId(owner, name);
-		const docRef = doc(this.db, this.REPOSITORIES_COLLECTION, repoId);
+	async checkRepository(repoUrl: string): Promise<StoredRepository | null> {
+		const q = query(
+			collection(this.db, this.REPOSITORIES_COLLECTION),
+			where('url', '==', repoUrl),
+			limit(1)
+		);
 
 		try {
-			const docSnap = await getDoc(docRef);
+			const querySnapshot = await getDocs(q);
 
-			if (!docSnap.exists()) {
+			if (querySnapshot.empty) {
 				return null;
 			}
 
-			const data = docSnap.data() as StoredRepositoryFirestore;
+			const doc = querySnapshot.docs[0];
+			const data = doc.data() as StoredRepositoryFirestore;
 			return {
-				id: repoId,
+				id: doc.id,
 				...data,
 				createdAt: data.createdAt.toDate(),
 				updatedAt: data.updatedAt.toDate(),
 				lastAnalyzed: data.lastAnalyzed.toDate()
 			} as StoredRepository;
 		} catch (error) {
-			console.error(`Something went wrong when attempting to check repository ${repoId}:`, error);
+			console.error(`Something went wrong when attempting to check repository ${repoUrl}:`, error);
 			return null;
 		}
 	}
@@ -79,7 +65,7 @@ class Firestore {
 		status: 'analyzing' | 'completed' | 'failed' = 'completed',
 		error?: string
 	): Promise<string> {
-		const repoId = this.generateRepoId(owner, name);
+		const repoId = createId('lowercase', 9);
 		const now = FirestoreTimestamp.now();
 
 		const storedRepo: StoredRepositoryFirestore = {

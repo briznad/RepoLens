@@ -1,89 +1,96 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
-  import { firestore } from "$lib/services/firestore.js";
+  import { firestore } from "$lib/services/firestore";
   import type { StoredRepository } from "$types/repository";
-  import { parseGitHubUrl } from "$lib/github.js";
-  
-  let repoUrl = $state('');
+  import { parseGitHubUrl } from "$lib/github";
+
+  let repoUrl = $state("");
   let isLoading = $state(false);
-  let error = $state('');
+  let error = $state("");
   let recentRepos = $state<StoredRepository[]>([]);
   let loadingRecent = $state(true);
-  
+
   // Load recent repositories on mount
   onMount(async () => {
     try {
       recentRepos = await firestore.getRecentRepositories(5);
     } catch (err) {
-      console.error('Failed to load recent repositories:', err);
+      console.error("Failed to load recent repositories:", err);
     } finally {
       loadingRecent = false;
     }
   });
-  
-  const validateGitHubUrl = (url: string): { isValid: boolean; error?: string } => {
+
+  const validateGitHubUrl = (
+    url: string
+  ): { isValid: boolean; error?: string } => {
     if (!url.trim()) {
-      return { isValid: false, error: 'Please enter a repository URL' };
+      return { isValid: false, error: "Please enter a repository URL" };
     }
-    
+
     try {
-      const parsed = parseGitHubUrl(url);
+      parseGitHubUrl(url);
+
       return { isValid: true };
     } catch (err) {
-      return { 
-        isValid: false, 
-        error: err instanceof Error ? err.message : 'Please enter a valid GitHub repository URL (e.g., https://github.com/owner/repo)' 
+      return {
+        isValid: false,
+        error:
+          err instanceof Error
+            ? err.message
+            : "Please enter a valid GitHub repository URL (e.g., https://github.com/owner/repo)",
       };
     }
   };
-  
+
   const handleSubmit = async () => {
-    error = '';
+    error = "";
     const validation = validateGitHubUrl(repoUrl);
-    
+
     if (!validation.isValid) {
-      error = validation.error || 'Invalid URL';
+      error = validation.error || "Invalid URL";
       return;
     }
-    
+
     isLoading = true;
-    
+
     try {
-      const { owner, repo } = parseGitHubUrl(repoUrl);
-      
       // Check if repository already exists and is fresh
-      const existingRepo = await firestore.checkRepository(owner, repo);
-      
+      const existingRepo = await firestore.checkRepository(repoUrl);
+
       if (existingRepo && !firestore.isRepositoryStale(existingRepo)) {
         // Repository is fresh, redirect directly to results
         goto(`/repo/${existingRepo.id}`);
         return;
       }
-      
+
       // Repository needs analysis
       goto(`/analyze?url=${encodeURIComponent(repoUrl)}`);
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to process repository URL';
+      error =
+        err instanceof Error ? err.message : "Failed to process repository URL";
     } finally {
       isLoading = false;
     }
   };
-  
+
   const handleRecentRepoClick = (repo: StoredRepository) => {
     goto(`/repo/${repo.id}`);
   };
-  
+
   const formatTimeAgo = (date: Date): string => {
     const now = new Date();
-    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
-    
-    if (diffInMinutes < 1) return 'Just now';
+    const diffInMinutes = Math.floor(
+      (now.getTime() - date.getTime()) / (1000 * 60)
+    );
+
+    if (diffInMinutes < 1) return "Just now";
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
-    
+
     const diffInHours = Math.floor(diffInMinutes / 60);
     if (diffInHours < 24) return `${diffInHours}h ago`;
-    
+
     const diffInDays = Math.floor(diffInHours / 24);
     return `${diffInDays}d ago`;
   };
@@ -98,10 +105,13 @@
           <ion-icon name="code-slash-outline" class="hero-icon"></ion-icon>
           RepoLens
         </h1>
-        <p class="hero-subtitle">Get a clear view of any public GitHub repository</p>
+        <p class="hero-subtitle">
+          Get a clear view of any public GitHub repository
+        </p>
         <p class="hero-description">
-          Analyze repository structure, understand code architecture, and explore documentation 
-          with AI-powered insights. Perfect for developers, code reviewers, and anyone exploring public codebases.
+          Analyze repository structure, understand code architecture, and
+          explore documentation with AI-powered insights. Perfect for
+          developers, code reviewers, and anyone exploring public codebases.
         </p>
       </div>
     </div>
@@ -110,31 +120,38 @@
     <ion-card class="input-card">
       <ion-card-header>
         <ion-card-title>Analyze a Public Repository</ion-card-title>
-        <ion-card-subtitle>Enter any public GitHub repository URL to get started</ion-card-subtitle>
+        <ion-card-subtitle
+          >Enter any public GitHub repository URL to get started</ion-card-subtitle
+        >
       </ion-card-header>
-      
+
       <ion-card-content>
-        <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+        <form
+          onsubmit={(e) => {
+            e.preventDefault();
+            handleSubmit();
+          }}
+        >
           <ion-item class="url-input" lines="none">
             <ion-input
               label="Public GitHub Repository URL"
               label-placement="stacked"
               placeholder="https://github.com/owner/repo"
               value={repoUrl}
-              onionInput={(e: any) => repoUrl = e.detail.value}
+              onionInput={(e: any) => (repoUrl = e.detail.value)}
               required
-              class={error ? 'ion-invalid' : ''}
+              class={error ? "ion-invalid" : ""}
             ></ion-input>
           </ion-item>
-          
+
           {#if error}
             <ion-text color="danger" class="error-text">
               <p>{error}</p>
             </ion-text>
           {/if}
-          
-          <ion-button 
-            expand="block" 
+
+          <ion-button
+            expand="block"
             type="submit"
             class="analyze-button"
             disabled={!repoUrl.trim() || isLoading}
@@ -159,25 +176,27 @@
             <ion-icon name="time-outline" class="section-icon"></ion-icon>
             Recently Analyzed
           </ion-card-title>
-          <ion-card-subtitle>Jump back into repositories you've already explored</ion-card-subtitle>
+          <ion-card-subtitle
+            >Jump back into repositories you've already explored</ion-card-subtitle
+          >
         </ion-card-header>
-        
+
         <ion-card-content>
           <ion-list class="recent-list">
             {#each recentRepos as repo}
-              <ion-item 
-                button 
+              <ion-item
+                button
                 onclick={() => handleRecentRepoClick(repo)}
                 class="recent-item"
               >
                 <ion-avatar slot="start" class="repo-avatar">
                   <ion-icon name="folder-outline"></ion-icon>
                 </ion-avatar>
-                
+
                 <ion-label>
                   <h3 class="repo-name">{repo.fullName}</h3>
                   <p class="repo-description">
-                    {repo.description || 'No description available'}
+                    {repo.description || "No description available"}
                   </p>
                   <div class="repo-meta">
                     {#if repo.language}
@@ -190,11 +209,17 @@
                       <ion-icon name="star-outline"></ion-icon>
                       <ion-label>{repo.stars}</ion-label>
                     </ion-chip>
-                    <span class="analyzed-time">{formatTimeAgo(repo.lastAnalyzed)}</span>
+                    <span class="analyzed-time"
+                      >{formatTimeAgo(repo.lastAnalyzed)}</span
+                    >
                   </div>
                 </ion-label>
-                
-                <ion-icon name="chevron-forward-outline" slot="end" class="chevron-icon"></ion-icon>
+
+                <ion-icon
+                  name="chevron-forward-outline"
+                  slot="end"
+                  class="chevron-icon"
+                ></ion-icon>
               </ion-item>
             {/each}
           </ion-list>
@@ -209,22 +234,34 @@
         <div class="feature-item">
           <ion-icon name="analytics-outline" class="feature-icon"></ion-icon>
           <h3>Code Analysis</h3>
-          <p>Understand public repository structure, dependencies, and code patterns</p>
+          <p>
+            Understand public repository structure, dependencies, and code
+            patterns
+          </p>
         </div>
         <div class="feature-item">
-          <ion-icon name="document-text-outline" class="feature-icon"></ion-icon>
+          <ion-icon name="document-text-outline" class="feature-icon"
+          ></ion-icon>
           <h3>Documentation</h3>
-          <p>Browse README files, code comments, and project documentation from public repos</p>
+          <p>
+            Browse README files, code comments, and project documentation from
+            public repos
+          </p>
         </div>
         <div class="feature-item">
           <ion-icon name="git-branch-outline" class="feature-icon"></ion-icon>
           <h3>Repository Insights</h3>
-          <p>View file organization, language distribution, and project metrics</p>
+          <p>
+            View file organization, language distribution, and project metrics
+          </p>
         </div>
         <div class="feature-item">
           <ion-icon name="chatbubble-outline" class="feature-icon"></ion-icon>
           <h3>AI-Powered Chat</h3>
-          <p>Ask questions about the public codebase and get intelligent responses</p>
+          <p>
+            Ask questions about the public codebase and get intelligent
+            responses
+          </p>
         </div>
       </div>
     </div>
@@ -309,7 +346,6 @@
     width: 16px;
     height: 16px;
   }
-
 
   // Recent Repositories
   .recent-card {
