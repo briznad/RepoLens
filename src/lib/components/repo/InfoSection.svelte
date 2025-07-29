@@ -1,46 +1,64 @@
 <script lang="ts">
-  import { logoGithub, hourglassOutline, timeOutline, checkmarkCircleOutline } from 'ionicons/icons';
-  import type { FirestoreRepo, AnalysisStatus } from '$types/repository';
-  import type { AnalysisResult } from '$types/analysis';
+  import {
+    logoGithub,
+    hourglassOutline,
+    timeOutline,
+    checkmarkCircleOutline,
+  } from "ionicons/icons";
+  import type { FirestoreRepo, AnalysisStatus } from "$types/repository";
+  import type { AnalysisResult } from "$types/analysis";
 
   interface Props {
     repo: FirestoreRepo;
     analysis: AnalysisResult;
     analysisStale: boolean;
-    analysisAge: string;
-    onOpenRepository?: () => void;
-    getFrameworkColor: (framework: string) => string;
     formatTimestamp: (timestamp: string) => string;
   }
 
-  let { 
-    repo,
-    analysis,
-    analysisStale,
-    analysisAge,
-    onOpenRepository = () => window.open(repo.url, "_blank"),
-    getFrameworkColor,
-    formatTimestamp
-  }: Props = $props();
+  let { repo, analysis, analysisStale, formatTimestamp }: Props = $props();
+
+  // Calculate analysis age for display
+  const analysisAge = $derived(() => {
+    if (!repo?.lastAnalyzed) return "Unknown";
+
+    const lastAnalyzed = new Date(repo.lastAnalyzed);
+    const now = new Date();
+    const ageMs = now.getTime() - lastAnalyzed.getTime();
+    const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
+    const ageDays = Math.floor(ageHours / 24);
+
+    if (ageDays > 0) {
+      return `${ageDays} day${ageDays > 1 ? "s" : ""} ago`;
+    } else if (ageHours > 0) {
+      return `${ageHours} hour${ageHours > 1 ? "s" : ""} ago`;
+    } else {
+      return "Recently";
+    }
+  });
+
+  const getFrameworkColor = (framework: string): string => {
+    const colors: Record<string, string> = {
+      react: "primary",
+      nextjs: "secondary",
+      svelte: "tertiary",
+      flask: "success",
+      fastapi: "warning",
+      unknown: "medium",
+    };
+    return colors[framework] || "medium";
+  };
 </script>
 
 <div class="repo-info-section">
   <div class="repo-header">
     <div class="repo-title">
       <h3>{repo.name}</h3>
-      <ion-button
-        fill="clear"
-        size="small"
-        onclick={onOpenRepository}
-      >
+      <ion-button fill="clear" size="small" href={repo.url} target="_blank">
         <ion-icon icon={logoGithub} slot="icon-only"></ion-icon>
       </ion-button>
     </div>
     <div class="repo-meta">
-      <ion-chip
-        color={getFrameworkColor(analysis.framework)}
-        size="small"
-      >
+      <ion-chip color={getFrameworkColor(analysis.framework)} size="small">
         <ion-label>{analysis.framework}</ion-label>
       </ion-chip>
       <div class="analysis-status">
@@ -69,7 +87,7 @@
     <div class="timestamp-info">
       <div class="timestamp">
         <span class="label">Analyzed:</span>
-        <span class="value">{analysisAge}</span>
+        <span class="value">{analysisAge()}</span>
       </div>
       <div class="timestamp">
         <span class="label">Updated:</span>
@@ -144,7 +162,7 @@
 
     .timestamp-info {
       font-size: 0.8rem;
-      
+
       .timestamp {
         display: flex;
         justify-content: space-between;

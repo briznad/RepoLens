@@ -1,21 +1,24 @@
 <script lang="ts">
-  import { logoGithub, warningOutline, syncOutline, refreshOutline } from 'ionicons/icons';
-  import type { FirestoreRepo } from '$types/repository';
+  import {
+    logoGithub,
+    warningOutline,
+    syncOutline,
+    refreshOutline,
+  } from "ionicons/icons";
+  import type { FirestoreRepo } from "$types/repository";
 
   interface Props {
     repo: FirestoreRepo;
     analysisStale: boolean;
     refreshing?: boolean;
-    onOpenRepository?: () => void;
     onRefreshAnalysis?: () => void;
   }
 
-  let { 
+  let {
     repo,
     analysisStale,
     refreshing = false,
-    onOpenRepository = () => window.open(repo.url, "_blank"),
-    onRefreshAnalysis = () => {}
+    onRefreshAnalysis = () => {},
   }: Props = $props();
 </script>
 
@@ -47,7 +50,8 @@
   <ion-buttons slot="end">
     <ion-button
       fill="clear"
-      onclick={onOpenRepository}
+      href={repo.url}
+      target="_blank"
       title="View on GitHub"
     >
       <ion-icon icon={logoGithub} slot="icon-only"></ion-icon>
@@ -70,8 +74,8 @@
 <style lang="scss">
   .header-title {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
+    gap: 0.5em;
 
     .repo-name {
       font-size: 1.1rem;

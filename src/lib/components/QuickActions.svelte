@@ -1,18 +1,21 @@
 <script lang="ts">
-  import { addOutline, shareOutline, hourglassOutline, refreshOutline } from 'ionicons/icons';
+  import {
+    addOutline,
+    shareOutline,
+    hourglassOutline,
+    refreshOutline,
+  } from "ionicons/icons";
 
   interface Props {
     refreshing: boolean;
     onRefreshAnalysis: () => void;
-    onAnalyzeNew: () => void;
     onShare?: () => void;
   }
 
-  let { 
+  let {
     refreshing,
     onRefreshAnalysis,
-    onAnalyzeNew,
-    onShare = () => navigator.share?.({ url: window.location.href })
+    onShare = () => navigator.share?.({ url: window.location.href }),
   }: Props = $props();
 </script>
 
@@ -21,29 +24,23 @@
     <ion-label>Actions</ion-label>
   </ion-list-header>
 
-  <ion-item
-    button
-    onclick={onRefreshAnalysis}
-    disabled={refreshing}
-  >
-    <ion-icon
-      icon={refreshing ? hourglassOutline : refreshOutline}
-      slot="start"
-    ></ion-icon>
-    <ion-label
-      >{refreshing ? "Refreshing..." : "Refresh Analysis"}</ion-label
-    >
-  </ion-item>
-
-  <ion-item button onclick={onAnalyzeNew}>
+  <ion-item button href="/">
     <ion-icon icon={addOutline} slot="start"></ion-icon>
     <ion-label>Analyze New Repository</ion-label>
   </ion-item>
 
   <ion-item
     button
-    onclick={onShare}
+    onclick={onRefreshAnalysis}
+    disabled={refreshing}
+    detail={false}
   >
+    <ion-icon icon={refreshing ? hourglassOutline : refreshOutline} slot="start"
+    ></ion-icon>
+    <ion-label>{refreshing ? "Refreshing..." : "Refresh Analysis"}</ion-label>
+  </ion-item>
+
+  <ion-item button onclick={onShare} detail={false}>
     <ion-icon icon={shareOutline} slot="start"></ion-icon>
     <ion-label>Share Repository</ion-label>
   </ion-item>
