@@ -22,6 +22,26 @@ import { createId } from 'briznads-helpers';
 import { firebase } from '$services/firebase';
 
 /**
+ * Sanitizes data for Firestore by converting undefined values to null
+ */
+function sanitizeForFirestore<T extends Record<string, any>>(data: T): T {
+  const sanitized = {} as T;
+  
+  for (const [key, value] of Object.entries(data)) {
+    if (value === undefined) {
+      (sanitized as any)[key] = null;
+    } else if (value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date) && !(value instanceof FirestoreTimestamp)) {
+      // Recursively sanitize nested objects
+      (sanitized as any)[key] = sanitizeForFirestore(value);
+    } else {
+      (sanitized as any)[key] = value;
+    }
+  }
+  
+  return sanitized;
+}
+
+/**
  * Generic Firestore service providing CRUD operations for any collection
  */
 class Firestore {
@@ -43,11 +63,12 @@ class Firestore {
 		const docRef = doc(this.db, collectionName, docId);
 
 		try {
-			await setDoc(docRef, {
+			const sanitizedData = sanitizeForFirestore({
 				...data,
 				createdAt: FirestoreTimestamp.now(),
 				updatedAt: FirestoreTimestamp.now()
 			});
+			await setDoc(docRef, sanitizedData);
 			return docId;
 		} catch (error) {
 			console.error(`Error creating document in ${collectionName}:`, error);
