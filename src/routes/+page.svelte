@@ -1,9 +1,13 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
-  import { getRecentRepositories, checkRepositoryByUrl, findOrCreateRepo } from "$lib/services/repository";
-  import type { FirestoreRepo } from "$lib/types";
-  import { parseGitHubUrl } from "$lib/github";
+  import {
+    getRecentRepositories,
+    checkRepositoryByUrl,
+    findOrCreateRepo,
+  } from "$services/repository";
+  import type { FirestoreRepo } from "$types/repository";
+  import { parseGitHubUrl } from "$utilities/github-utils";
 
   let repoUrl = $state("");
   let isLoading = $state(false);
@@ -59,7 +63,7 @@
       // Check if repository already exists
       const existingRepo = await checkRepositoryByUrl(repoUrl);
 
-      if (existingRepo && existingRepo.analysisStatus === 'completed') {
+      if (existingRepo && existingRepo.analysisStatus === "completed") {
         // Repository exists and is analyzed, redirect directly to results
         goto(`/repo/${existingRepo.id}`);
         return;

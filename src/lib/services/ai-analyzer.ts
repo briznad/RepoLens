@@ -1,11 +1,11 @@
+import type { GitHubFile } from '$types/repository';
 import type {
-  GitHubFile,
   AnalysisResult,
   SubsystemDescription,
   OpenAIResponse,
   FileInterface,
   CitationLink
-} from '$types';
+} from '$types/analysis';
 
 import { analyzeRepo, extractKeyInterfaces, generateInlineCitations } from '$utilities/repo-analyzer';
 

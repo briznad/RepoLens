@@ -1,13 +1,13 @@
-import { firestore } from './firestore';
-import { parseGitHubUrl } from '../github';
+import { firestore } from '$services/firestore';
+import { parseGitHubUrl } from '$utilities/github-utils';
 import { where, orderBy, limit, Timestamp as FirestoreTimestamp } from 'firebase/firestore';
 import type {
   RepoDocument,
   FirestoreRepo,
   AnalysisStatus,
-  RepoData,
-  AnalysisResult
-} from '../types';
+  RepoData
+} from '$types/repository';
+import type { AnalysisResult } from '$types/analysis';
 
 // Collection name constant
 const REPOSITORIES_COLLECTION = 'repositories';
@@ -129,8 +129,8 @@ export async function storeRepository(
       name,
       fullName: repoData.full_name,
       url: repoData.html_url,
-      description: repoData.description,
-      language: repoData.language,
+      description: repoData.description || null,
+      language: repoData.language || null,
       stars: repoData.stargazers_count,
       forks: repoData.forks_count,
       lastAnalyzed: FirestoreTimestamp.now(),

@@ -1,33 +1,31 @@
 <script lang="ts">
-  import { page } from '$app/stores';
-  import { onMount, afterUpdate } from 'svelte';
-  import { goto } from '$app/navigation';
-  import { getRepoById } from '$lib/services/repository';
-  import type { 
-    FirestoreRepo, 
-    AnalysisResult,
-    ChatMessage
-  } from '$lib/types';
-  
+  import { page } from "$app/stores";
+  import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
+  import { getRepoById } from "$lib/services/repository";
+  import type { FirestoreRepo } from "$types/repository";
+  import type { AnalysisResult } from "$types/analysis";
+  import type { ChatMessage } from "$types/chat";
+
   const repoId = $derived($page.params.id);
-  
+
   // State management
   let repo = $state<FirestoreRepo | null>(null);
   let analysis = $state<AnalysisResult | null>(null);
   let loading = $state(true);
   let error = $state<string | null>(null);
-  
+
   // Chat state
   let messages = $state<ChatMessage[]>([]);
-  let currentMessage = $state('');
+  let currentMessage = $state("");
   let isStreaming = $state(false);
   let messagesContainer: HTMLElement;
   let messageInput: HTMLIonInputElement;
-  
+
   // Load repository data and initialize chat
   onMount(async () => {
     if (!repoId) {
-      error = 'Repository ID not found';
+      error = "Repository ID not found";
       loading = false;
       return;
     }
@@ -35,33 +33,32 @@
     try {
       const repoData = await getRepoById(repoId);
       if (!repoData) {
-        error = 'Repository not found';
+        error = "Repository not found";
         loading = false;
         return;
       }
 
       repo = repoData;
       analysis = repoData.analysisData || null;
-      
+
       if (!analysis) {
-        error = 'Repository analysis not available';
+        error = "Repository analysis not available";
         loading = false;
         return;
       }
 
       // Initialize with welcome message
       initializeChat();
-      
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to load repository';
+      error = err instanceof Error ? err.message : "Failed to load repository";
     } finally {
       loading = false;
     }
   });
 
-  // Auto-scroll to latest messages
-  afterUpdate(() => {
-    if (messagesContainer) {
+  // Auto-scroll to latest messages using effect
+  $effect(() => {
+    if (messagesContainer && messages.length > 0) {
       messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
   });
@@ -75,7 +72,7 @@
     const repoName = repo.name;
 
     const welcomeMessage: ChatMessage = {
-      id: '1',
+      id: "1",
       content: `Hi! I'm Iris 👋 I've analyzed the **${repoName}** ${framework} repository and created documentation for **${subsystemCount} subsystems**. I can help you navigate the docs and understand the codebase.
 
 **What I can help with:**
@@ -85,8 +82,8 @@
 • Understand architectural patterns
 
 What would you like to explore?`,
-      role: 'assistant',
-      timestamp: new Date().toISOString()
+      role: "assistant",
+      timestamp: new Date().toISOString(),
     };
 
     messages = [welcomeMessage];
@@ -99,27 +96,27 @@ What would you like to explore?`,
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       content: currentMessage.trim(),
-      role: 'user',
-      timestamp: new Date().toISOString()
+      role: "user",
+      timestamp: new Date().toISOString(),
     };
 
     messages = [...messages, userMessage];
     const messageText = currentMessage;
-    currentMessage = '';
+    currentMessage = "";
     isStreaming = true;
 
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
+      const response = await fetch("/api/chat", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
         body: JSON.stringify({
           message: messageText,
           repoId,
           repositoryData: repo,
-          analysisData: analysis
-        })
+          analysisData: analysis,
+        }),
       });
 
       if (!response.ok) {
@@ -127,27 +124,27 @@ What would you like to explore?`,
       }
 
       const data = await response.json();
-      
+
       if (data.success) {
         const assistantMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
           content: data.message,
-          role: 'assistant',
-          timestamp: new Date().toISOString()
+          role: "assistant",
+          timestamp: new Date().toISOString(),
         };
-        
+
         messages = [...messages, assistantMessage];
       } else {
-        throw new Error(data.error || 'Failed to get response');
+        throw new Error(data.error || "Failed to get response");
       }
-
     } catch (err) {
-      console.error('Chat error:', err);
+      console.error("Chat error:", err);
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
-        content: 'Sorry, I encountered an error processing your message. Please try again.',
-        role: 'assistant',
-        timestamp: new Date().toISOString()
+        content:
+          "Sorry, I encountered an error processing your message. Please try again.",
+        role: "assistant",
+        timestamp: new Date().toISOString(),
       };
       messages = [...messages, errorMessage];
     } finally {
@@ -157,7 +154,7 @@ What would you like to explore?`,
 
   // Handle enter key in input
   function handleKeyPress(event: KeyboardEvent) {
-    if (event.key === 'Enter' && !event.shiftKey) {
+    if (event.key === "Enter" && !event.shiftKey) {
       event.preventDefault();
       sendMessage();
     }
@@ -169,7 +166,7 @@ What would you like to explore?`,
       await navigator.clipboard.writeText(content);
       // Could add a toast notification here
     } catch (err) {
-      console.error('Failed to copy message:', err);
+      console.error("Failed to copy message:", err);
     }
   }
 
@@ -184,9 +181,9 @@ What would you like to explore?`,
 
   // Format timestamp
   function formatTime(timestamp: string): string {
-    return new Date(timestamp).toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    return new Date(timestamp).toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
     });
   }
 
@@ -194,11 +191,14 @@ What would you like to explore?`,
   function processMessageContent(content: string): string {
     // Convert markdown links to HTML
     return content
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>')
-      .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*(.*?)\*/g, '<em>$1</em>')
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      .replace(/\n/g, '<br>');
+      .replace(
+        /\[([^\]]+)\]\(([^)]+)\)/g,
+        '<a href="$2" target="_blank" rel="noopener">$1</a>'
+      )
+      .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+      .replace(/\*(.*?)\*/g, "<em>$1</em>")
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\n/g, "<br>");
   }
 </script>
 
@@ -222,7 +222,10 @@ What would you like to explore?`,
         <ion-card-content>
           <p>{error}</p>
           <div class="error-actions">
-            <ion-button fill="outline" onclick={() => goto(`/repo/${repoId}/docs`)}>
+            <ion-button
+              fill="outline"
+              onclick={() => goto(`/repo/${repoId}/docs`)}
+            >
               <ion-icon name="library-outline" slot="start"></ion-icon>
               View Documentation
             </ion-button>
@@ -246,31 +249,46 @@ What would you like to explore?`,
               <ion-icon name="library-outline" class="docs-icon"></ion-icon>
               <div>
                 <h4>Repository Documentation</h4>
-                <p>Comprehensive documentation for {analysis.subsystems.length} subsystems</p>
+                <p>
+                  Comprehensive documentation for {analysis.subsystems.length} subsystems
+                </p>
               </div>
             </div>
-            <ion-button fill="outline" onclick={() => navigateToDocumentation()}>
+            <ion-button
+              fill="outline"
+              onclick={() => navigateToDocumentation()}
+            >
               <ion-icon name="book-outline" slot="start"></ion-icon>
               View Docs
             </ion-button>
           </div>
         </ion-card-content>
       </ion-card>
-      
+
       <!-- Chat Messages -->
       <div class="messages-container" bind:this={messagesContainer}>
         {#each messages as message}
-          <div class="message-wrapper {message.role === 'user' ? 'user-message' : 'ai-message'}">
+          <div
+            class="message-wrapper {message.role === 'user'
+              ? 'user-message'
+              : 'ai-message'}"
+          >
             <div class="message-bubble">
               <div class="message-header">
                 <div class="message-sender">
-                  <ion-icon name={message.role === 'user' ? 'person-circle-outline' : 'sparkles-outline'}></ion-icon>
-                  <span class="sender-name">{message.role === 'user' ? 'You' : 'Iris'}</span>
+                  <ion-icon
+                    name={message.role === "user"
+                      ? "person-circle-outline"
+                      : "sparkles-outline"}
+                  ></ion-icon>
+                  <span class="sender-name"
+                    >{message.role === "user" ? "You" : "Iris"}</span
+                  >
                 </div>
                 <div class="message-actions">
                   <span class="timestamp">{formatTime(message.timestamp)}</span>
-                  <ion-button 
-                    fill="clear" 
+                  <ion-button
+                    fill="clear"
                     size="small"
                     onclick={() => copyMessage(message.content)}
                     title="Copy message"
@@ -279,11 +297,14 @@ What would you like to explore?`,
                   </ion-button>
                 </div>
               </div>
-              <div class="message-content" innerHTML={processMessageContent(message.content)}></div>
+              <div
+                class="message-content"
+                innerHTML={processMessageContent(message.content)}
+              ></div>
             </div>
           </div>
         {/each}
-        
+
         <!-- Streaming indicator -->
         {#if isStreaming}
           <div class="message-wrapper ai-message">
@@ -316,21 +337,24 @@ What would you like to explore?`,
           <ion-textarea
             placeholder="Ask Iris about the repository..."
             value={currentMessage}
-            onionInput={(e: any) => currentMessage = e.detail.value}
+            onionInput={(e: any) => (currentMessage = e.detail.value)}
             onkeydown={handleKeyPress}
             rows={1}
             auto-grow={true}
             class="message-input"
             bind:this={messageInput}
           ></ion-textarea>
-          <ion-button 
-            slot="end" 
+          <ion-button
+            slot="end"
             onclick={sendMessage}
             fill="clear"
             disabled={!currentMessage.trim() || isStreaming}
             class="send-button"
           >
-            <ion-icon name={isStreaming ? 'hourglass-outline' : 'send'} slot="icon-only"></ion-icon>
+            <ion-icon
+              name={isStreaming ? "hourglass-outline" : "send"}
+              slot="icon-only"
+            ></ion-icon>
           </ion-button>
         </ion-item>
       </div>
@@ -340,7 +364,8 @@ What would you like to explore?`,
 
 <style lang="scss">
   // Loading and Error States
-  .loading-container, .error-container {
+  .loading-container,
+  .error-container {
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -388,7 +413,11 @@ What would you like to explore?`,
   // Documentation Shortcut Card
   .docs-shortcut-card {
     margin-bottom: 24px;
-    --background: linear-gradient(135deg, var(--ion-color-primary-tint), var(--ion-color-secondary-tint));
+    --background: linear-gradient(
+      135deg,
+      var(--ion-color-primary-tint),
+      var(--ion-color-secondary-tint)
+    );
     border: none;
   }
 
@@ -450,10 +479,10 @@ What would you like to explore?`,
   .message-wrapper {
     display: flex;
     width: 100%;
-    
+
     &.user-message {
       justify-content: flex-end;
-      
+
       .message-bubble {
         max-width: 75%;
         background: var(--ion-color-primary);
@@ -475,10 +504,10 @@ What would you like to explore?`,
         }
       }
     }
-    
+
     &.ai-message {
       justify-content: flex-start;
-      
+
       .message-bubble {
         max-width: 85%;
         background: var(--ion-color-light);
@@ -556,7 +585,7 @@ What would you like to explore?`,
       background: var(--ion-color-medium-tint);
       padding: 2px 6px;
       border-radius: 4px;
-      font-family: 'Courier New', monospace;
+      font-family: "Courier New", monospace;
       font-size: 0.9em;
     }
 
@@ -582,14 +611,22 @@ What would you like to explore?`,
       background: var(--ion-color-medium);
       animation: typing 1.4s infinite ease-in-out;
 
-      &:nth-child(1) { animation-delay: -0.32s; }
-      &:nth-child(2) { animation-delay: -0.16s; }
-      &:nth-child(3) { animation-delay: 0s; }
+      &:nth-child(1) {
+        animation-delay: -0.32s;
+      }
+      &:nth-child(2) {
+        animation-delay: -0.16s;
+      }
+      &:nth-child(3) {
+        animation-delay: 0s;
+      }
     }
   }
 
   @keyframes typing {
-    0%, 80%, 100% {
+    0%,
+    80%,
+    100% {
       transform: scale(0.8);
       opacity: 0.5;
     }
@@ -665,7 +702,7 @@ What would you like to explore?`,
       &.user-message .message-bubble {
         max-width: 85%;
       }
-      
+
       &.ai-message .message-bubble {
         max-width: 90%;
       }

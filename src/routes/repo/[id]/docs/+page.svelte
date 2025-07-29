@@ -1,35 +1,37 @@
 <script lang="ts">
-  import { page } from '$app/stores';
-  import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
-  import { currentRepo, isRepoLoaded } from '$lib/stores';
-  import { getRepoById } from '$lib/services/repository';
-  import type { 
-    FirestoreRepo, 
-    AnalysisResult, 
-    Subsystem, 
+  import { page } from "$app/stores";
+  import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
+  import { repositoryManager } from "$services/repository-manager";
+  import { getRepoById } from "$lib/services/repository";
+  import type { FirestoreRepo } from "$types/repository";
+  import type {
+    AnalysisResult,
+    Subsystem,
     SubsystemDescription,
-    Framework 
-  } from '$lib/types';
+    Framework,
+  } from "$types/analysis";
 
   const repoId = $derived($page.params.id);
-  
+
   // State management
   let repo = $state<FirestoreRepo | null>(null);
   let analysis = $state<AnalysisResult | null>(null);
   let loading = $state(true);
   let error = $state<string | null>(null);
-  
+
   // Search and filter state
-  let searchQuery = $state('');
-  let selectedFramework = $state<Framework | 'all'>('all');
-  let sortBy = $state<'name' | 'files' | 'alphabetical'>('name');
-  let filteredSubsystems = $state<(Subsystem & { description?: SubsystemDescription })[]>([]);
+  let searchQuery = $state("");
+  let selectedFramework = $state<Framework | "all">("all");
+  let sortBy = $state<"name" | "files" | "alphabetical">("name");
+  let filteredSubsystems = $state<
+    (Subsystem & { description?: SubsystemDescription })[]
+  >([]);
 
   // Load repository data
   onMount(async () => {
     if (!repoId) {
-      error = 'Repository ID not found';
+      error = "Repository ID not found";
       loading = false;
       return;
     }
@@ -37,26 +39,25 @@
     try {
       const repoData = await getRepoById(repoId);
       if (!repoData) {
-        error = 'Repository not found';
+        error = "Repository not found";
         loading = false;
         return;
       }
 
       repo = repoData;
       analysis = repoData.analysisData || null;
-      
+
       // Combine subsystems with their AI descriptions if available
       if (analysis) {
-        filteredSubsystems = analysis.subsystems.map(subsystem => {
+        filteredSubsystems = analysis.subsystems.map((subsystem) => {
           const description = analysis?.subsystemDescriptions?.find(
-            desc => desc.name === subsystem.name
+            (desc) => desc.name === subsystem.name
           );
           return { ...subsystem, description };
         });
       }
-      
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to load repository';
+      error = err instanceof Error ? err.message : "Failed to load repository";
     } finally {
       loading = false;
     }
@@ -66,9 +67,9 @@
   $effect(() => {
     if (!analysis) return;
 
-    let filtered = analysis.subsystems.map(subsystem => {
+    let filtered = analysis.subsystems.map((subsystem) => {
       const description = analysis?.subsystemDescriptions?.find(
-        desc => desc.name === subsystem.name
+        (desc) => desc.name === subsystem.name
       );
       return { ...subsystem, description };
     });
@@ -76,30 +77,33 @@
     // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(subsystem => 
-        subsystem.name.toLowerCase().includes(query) ||
-        subsystem.description?.description?.toLowerCase().includes(query) ||
-        subsystem.files.some(file => file.path.toLowerCase().includes(query))
+      filtered = filtered.filter(
+        (subsystem) =>
+          subsystem.name.toLowerCase().includes(query) ||
+          subsystem.description?.description?.toLowerCase().includes(query) ||
+          subsystem.files.some((file) =>
+            file.path.toLowerCase().includes(query)
+          )
       );
     }
 
     // Apply framework filter
-    if (selectedFramework !== 'all') {
+    if (selectedFramework !== "all") {
       // This is a simple filter - in reality you might want more sophisticated filtering
-      filtered = filtered.filter(subsystem => 
-        analysis?.framework === selectedFramework
+      filtered = filtered.filter(
+        (subsystem) => analysis?.framework === selectedFramework
       );
     }
 
     // Apply sorting
     switch (sortBy) {
-      case 'alphabetical':
+      case "alphabetical":
         filtered.sort((a, b) => a.name.localeCompare(b.name));
         break;
-      case 'files':
+      case "files":
         filtered.sort((a, b) => b.files.length - a.files.length);
         break;
-      case 'name':
+      case "name":
       default:
         // Keep original order or sort by priority if available
         break;
@@ -110,33 +114,39 @@
 
   // Helper functions
   const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 B';
+    if (bytes === 0) return "0 B";
     const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   };
 
   const getFrameworkColor = (framework: Framework): string => {
     const colors: Record<Framework, string> = {
-      'react': 'primary',
-      'nextjs': 'secondary',
-      'svelte': 'tertiary',
-      'flask': 'success',
-      'fastapi': 'warning',
-      'unknown': 'medium'
+      react: "primary",
+      nextjs: "secondary",
+      svelte: "tertiary",
+      flask: "success",
+      fastapi: "warning",
+      unknown: "medium",
     };
-    return colors[framework] || 'medium';
+    return colors[framework] || "medium";
   };
 
-  const getLanguagePercentage = (language: string, totalSize: number): number => {
+  const getLanguagePercentage = (
+    language: string,
+    totalSize: number
+  ): number => {
     if (!analysis?.languages || totalSize === 0) return 0;
     return (analysis.languages[language] / totalSize) * 100;
   };
 
   const getTotalSize = (): number => {
     if (!analysis?.languages) return 0;
-    return Object.values(analysis.languages).reduce((sum, size) => sum + size, 0);
+    return Object.values(analysis.languages).reduce(
+      (sum, size) => sum + size,
+      0
+    );
   };
 
   const handleSubsystemClick = (subsystemName: string) => {
@@ -145,7 +155,7 @@
 
   const handleGitHubClick = () => {
     if (repo?.url) {
-      window.open(repo.url, '_blank');
+      window.open(repo.url, "_blank");
     }
   };
 </script>
@@ -163,7 +173,7 @@
       </ion-card-header>
       <ion-card-content>
         <p>{error}</p>
-        <ion-button fill="outline" onclick={() => goto('/')}>
+        <ion-button fill="outline" onclick={() => goto("/")}>
           <ion-icon name="home" slot="start"></ion-icon>
           Return Home
         </ion-button>
@@ -238,13 +248,17 @@
               </ion-col>
               <ion-col size="12" size-md="3">
                 <div class="stat-item">
-                  <div class="stat-number">{Object.keys(analysis.languages).length}</div>
+                  <div class="stat-number">
+                    {Object.keys(analysis.languages).length}
+                  </div>
                   <div class="stat-label">Languages</div>
                 </div>
               </ion-col>
               <ion-col size="12" size-md="3">
                 <div class="stat-item">
-                  <div class="stat-number">{formatFileSize(getTotalSize())}</div>
+                  <div class="stat-number">
+                    {formatFileSize(getTotalSize())}
+                  </div>
                   <div class="stat-label">Total Size</div>
                 </div>
               </ion-col>
@@ -256,16 +270,24 @@
             <div class="language-section">
               <h3>Language Distribution</h3>
               <div class="language-bars">
-                {#each Object.entries(analysis.languages).sort(([,a], [,b]) => b - a) as [language, size]}
+                {#each Object.entries(analysis.languages).sort(([, a], [, b]) => b - a) as [language, size]}
                   <div class="language-bar">
                     <div class="language-info">
                       <span class="language-name">{language}</span>
-                      <span class="language-percentage">{getLanguagePercentage(language, getTotalSize()).toFixed(1)}%</span>
+                      <span class="language-percentage"
+                        >{getLanguagePercentage(
+                          language,
+                          getTotalSize()
+                        ).toFixed(1)}%</span
+                      >
                     </div>
                     <div class="progress-bar">
-                      <div 
-                        class="progress-fill" 
-                        style="width: {getLanguagePercentage(language, getTotalSize())}%"
+                      <div
+                        class="progress-fill"
+                        style="width: {getLanguagePercentage(
+                          language,
+                          getTotalSize()
+                        )}%"
                       ></div>
                     </div>
                   </div>
@@ -283,18 +305,21 @@
             <ion-searchbar
               placeholder="Search subsystems, files, or descriptions..."
               value={searchQuery}
-              onionInput={(e: any) => searchQuery = e.detail.value}
+              onionInput={(e: any) => (searchQuery = e.detail.value)}
               show-clear-button="focus"
             ></ion-searchbar>
-            
+
             <div class="filter-controls">
               <ion-select
                 placeholder="Sort by"
                 value={sortBy}
-                onionSelectionChange={(e: any) => sortBy = e.detail.value}
+                onionSelectionChange={(e: any) => (sortBy = e.detail.value)}
               >
-                <ion-select-option value="name">Default Order</ion-select-option>
-                <ion-select-option value="alphabetical">Alphabetical</ion-select-option>
+                <ion-select-option value="name">Default Order</ion-select-option
+                >
+                <ion-select-option value="alphabetical"
+                  >Alphabetical</ion-select-option
+                >
                 <ion-select-option value="files">File Count</ion-select-option>
               </ion-select>
             </div>
@@ -310,7 +335,10 @@
             Subsystems & Components
           </h2>
           <p class="section-subtitle">
-            {filteredSubsystems.length} subsystem{filteredSubsystems.length !== 1 ? 's' : ''} found
+            {filteredSubsystems.length} subsystem{filteredSubsystems.length !==
+            1
+              ? "s"
+              : ""} found
           </p>
         </div>
 
@@ -318,13 +346,16 @@
           <ion-card class="empty-state-card">
             <ion-card-content>
               <div class="empty-state">
-                <ion-icon name="folder-open-outline" class="empty-icon"></ion-icon>
+                <ion-icon name="folder-open-outline" class="empty-icon"
+                ></ion-icon>
                 <h3>No subsystems found</h3>
                 <p>
-                  {searchQuery ? 'Try adjusting your search criteria.' : 'This repository doesn\'t have clearly defined subsystems.'}
+                  {searchQuery
+                    ? "Try adjusting your search criteria."
+                    : "This repository doesn't have clearly defined subsystems."}
                 </p>
                 {#if searchQuery}
-                  <ion-button fill="outline" onclick={() => searchQuery = ''}>
+                  <ion-button fill="outline" onclick={() => (searchQuery = "")}>
                     Clear Search
                   </ion-button>
                 {/if}
@@ -336,7 +367,11 @@
             <ion-row>
               {#each filteredSubsystems as subsystem}
                 <ion-col size="12" size-md="6" size-lg="4">
-                  <ion-card class="subsystem-card" button onclick={() => handleSubsystemClick(subsystem.name)}>
+                  <ion-card
+                    class="subsystem-card"
+                    button
+                    onclick={() => handleSubsystemClick(subsystem.name)}
+                  >
                     <ion-card-header>
                       <div class="subsystem-header">
                         <ion-card-title class="subsystem-title">
@@ -347,7 +382,7 @@
                         </ion-chip>
                       </div>
                     </ion-card-header>
-                    
+
                     <ion-card-content>
                       <div class="subsystem-content">
                         <!-- AI-Generated Description -->
@@ -368,12 +403,17 @@
                             <div class="file-chips">
                               {#each subsystem.description.keyFiles.slice(0, 3) as keyFile}
                                 <ion-chip size="small" color="medium">
-                                  <ion-label>{keyFile.split('/').pop()}</ion-label>
+                                  <ion-label
+                                    >{keyFile.split("/").pop()}</ion-label
+                                  >
                                 </ion-chip>
                               {/each}
                               {#if subsystem.description.keyFiles.length > 3}
                                 <ion-chip size="small" color="light">
-                                  <ion-label>+{subsystem.description.keyFiles.length - 3} more</ion-label>
+                                  <ion-label
+                                    >+{subsystem.description.keyFiles.length -
+                                      3} more</ion-label
+                                  >
                                 </ion-chip>
                               {/if}
                             </div>
@@ -385,12 +425,16 @@
                             <div class="file-chips">
                               {#each subsystem.files.slice(0, 3) as file}
                                 <ion-chip size="small" color="medium">
-                                  <ion-label>{file.path.split('/').pop()}</ion-label>
+                                  <ion-label
+                                    >{file.path.split("/").pop()}</ion-label
+                                  >
                                 </ion-chip>
                               {/each}
                               {#if subsystem.files.length > 3}
                                 <ion-chip size="small" color="light">
-                                  <ion-label>+{subsystem.files.length - 3} more</ion-label>
+                                  <ion-label
+                                    >+{subsystem.files.length - 3} more</ion-label
+                                  >
                                 </ion-chip>
                               {/if}
                             </div>
@@ -411,11 +455,16 @@
                           </div>
                         {/if}
                       </div>
-                      
+
                       <div class="subsystem-footer">
-                        <ion-button fill="clear" size="small" class="view-details-btn">
+                        <ion-button
+                          fill="clear"
+                          size="small"
+                          class="view-details-btn"
+                        >
                           <ion-label>View Details</ion-label>
-                          <ion-icon name="arrow-forward-outline" slot="end"></ion-icon>
+                          <ion-icon name="arrow-forward-outline" slot="end"
+                          ></ion-icon>
                         </ion-button>
                       </div>
                     </ion-card-content>
@@ -445,7 +494,8 @@
                     <ion-list>
                       {#each analysis.mainFiles.slice(0, 5) as file}
                         <ion-item lines="none" class="file-item">
-                          <ion-icon name="document-outline" slot="start"></ion-icon>
+                          <ion-icon name="document-outline" slot="start"
+                          ></ion-icon>
                           <ion-label>{file.path}</ion-label>
                         </ion-item>
                       {/each}
@@ -462,7 +512,8 @@
                     <ion-list>
                       {#each analysis.configFiles.slice(0, 5) as file}
                         <ion-item lines="none" class="file-item">
-                          <ion-icon name="settings-outline" slot="start"></ion-icon>
+                          <ion-icon name="settings-outline" slot="start"
+                          ></ion-icon>
                           <ion-label>{file.path}</ion-label>
                         </ion-item>
                       {/each}
@@ -479,7 +530,8 @@
                     <ion-list>
                       {#each analysis.documentationFiles.slice(0, 5) as file}
                         <ion-item lines="none" class="file-item">
-                          <ion-icon name="document-text-outline" slot="start"></ion-icon>
+                          <ion-icon name="document-text-outline" slot="start"
+                          ></ion-icon>
                           <ion-label>{file.path}</ion-label>
                         </ion-item>
                       {/each}
@@ -510,11 +562,11 @@
     align-items: center;
     justify-content: center;
     min-height: 200px;
-    
+
     ion-spinner {
       margin-bottom: 16px;
     }
-    
+
     p {
       color: var(--ion-color-medium);
       font-size: 1rem;
@@ -533,7 +585,11 @@
   }
 
   .repo-header-card {
-    --background: linear-gradient(135deg, var(--ion-color-primary-tint), var(--ion-color-secondary-tint));
+    --background: linear-gradient(
+      135deg,
+      var(--ion-color-primary-tint),
+      var(--ion-color-secondary-tint)
+    );
     border: none;
   }
 
@@ -542,7 +598,7 @@
     justify-content: space-between;
     align-items: flex-start;
     gap: 24px;
-    
+
     @media (max-width: 768px) {
       flex-direction: column;
       align-items: stretch;
@@ -577,13 +633,13 @@
   .stat-item {
     text-align: center;
     padding: 16px;
-    
+
     .stat-number {
       font-size: 2rem;
       font-weight: bold;
       color: var(--ion-color-primary);
     }
-    
+
     .stat-label {
       font-size: 0.9rem;
       color: var(--ion-color-medium);
@@ -593,7 +649,7 @@
 
   .language-section {
     margin-top: 24px;
-    
+
     h3 {
       font-size: 1.2rem;
       margin-bottom: 16px;
@@ -613,23 +669,23 @@
       justify-content: space-between;
       margin-bottom: 4px;
       font-size: 0.9rem;
-      
+
       .language-name {
         font-weight: 500;
         color: var(--ion-color-dark);
       }
-      
+
       .language-percentage {
         color: var(--ion-color-medium);
       }
     }
-    
+
     .progress-bar {
       height: 6px;
       background: var(--ion-color-light);
       border-radius: 3px;
       overflow: hidden;
-      
+
       .progress-fill {
         height: 100%;
         background: var(--ion-color-primary);
@@ -647,7 +703,7 @@
     display: flex;
     gap: 16px;
     align-items: center;
-    
+
     @media (max-width: 768px) {
       flex-direction: column;
       align-items: stretch;
@@ -667,7 +723,7 @@
 
   .section-header {
     margin-bottom: 20px;
-    
+
     h2 {
       display: flex;
       align-items: center;
@@ -676,7 +732,7 @@
       color: var(--ion-color-dark);
       margin: 0 0 8px 0;
     }
-    
+
     .section-subtitle {
       color: var(--ion-color-medium);
       font-size: 1rem;
@@ -690,9 +746,11 @@
 
   .subsystem-card {
     height: 100%;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
     cursor: pointer;
-    
+
     &:hover {
       transform: translateY(-4px);
       box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
@@ -727,16 +785,17 @@
     line-height: 1.5;
     color: var(--ion-color-dark);
     margin: 0 0 16px 0;
-    
+
     &.fallback {
       color: var(--ion-color-medium);
       font-style: italic;
     }
   }
 
-  .key-files, .technologies {
+  .key-files,
+  .technologies {
     margin-bottom: 16px;
-    
+
     h4 {
       font-size: 0.9rem;
       font-weight: 600;
@@ -745,7 +804,8 @@
     }
   }
 
-  .file-chips, .tech-chips {
+  .file-chips,
+  .tech-chips {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
@@ -770,18 +830,18 @@
   .empty-state {
     text-align: center;
     padding: 40px 20px;
-    
+
     .empty-icon {
       font-size: 4rem;
       color: var(--ion-color-medium);
       margin-bottom: 16px;
     }
-    
+
     h3 {
       color: var(--ion-color-dark);
       margin-bottom: 8px;
     }
-    
+
     p {
       color: var(--ion-color-medium);
       margin-bottom: 24px;
@@ -809,12 +869,12 @@
     --padding-start: 0;
     --padding-end: 0;
     --min-height: 36px;
-    
+
     ion-icon {
       color: var(--ion-color-medium);
       margin-right: 8px;
     }
-    
+
     ion-label {
       font-size: 0.9rem;
       color: var(--ion-color-dark);
@@ -832,11 +892,11 @@
     .docs-container {
       padding: 0 8px;
     }
-    
+
     .repo-title {
       font-size: 1.5rem;
     }
-    
+
     .section-header h2 {
       font-size: 1.5rem;
     }

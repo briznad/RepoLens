@@ -1,25 +1,21 @@
 <script lang="ts">
-  import type { Snippet } from 'svelte';
-  import { page } from '$app/stores';
-  import { goto } from '$app/navigation';
-  import { onMount } from 'svelte';
-  import { getRepoById } from '$lib/services/repository';
-  import type { 
-    FirestoreRepo, 
-    AnalysisResult, 
-    AnalysisStatus,
-    Subsystem
-  } from '$lib/types';
-  
+  import type { Snippet } from "svelte";
+  import { page } from "$app/stores";
+  import { goto } from "$app/navigation";
+  import { onMount } from "svelte";
+  import { getRepoById } from "$lib/services/repository";
+  import type { FirestoreRepo, AnalysisStatus } from "$types/repository";
+  import type { AnalysisResult, Subsystem } from "$types/analysis";
+
   interface Props {
     children: Snippet;
   }
-  
+
   let { children }: Props = $props();
-  
+
   const repoId = $derived($page.params.id);
   const currentPath = $derived($page.url.pathname);
-  
+
   // State management
   let repo = $state<FirestoreRepo | null>(null);
   let analysis = $state<AnalysisResult | null>(null);
@@ -27,16 +23,16 @@
   let error = $state<string | null>(null);
   let sidebarOpen = $state(false);
   let subsystemsExpanded = $state(true);
-  
+
   // Freshness checking
   let analysisStale = $state(false);
-  let analysisAge = $state<string>('');
+  let analysisAge = $state<string>("");
   let refreshing = $state(false);
-  
+
   // Load repository data on mount
   onMount(async () => {
     if (!repoId) {
-      error = 'Repository ID not found';
+      error = "Repository ID not found";
       loading = false;
       return;
     }
@@ -44,28 +40,30 @@
     try {
       const repoData = await getRepoById(repoId);
       if (!repoData) {
-        error = 'Repository not found';
+        error = "Repository not found";
         // Redirect to home after a brief delay
-        setTimeout(() => goto('/'), 2000);
+        setTimeout(() => goto("/"), 2000);
         loading = false;
         return;
       }
 
       repo = repoData;
       analysis = repoData.analysisData || null;
-      
+
       // Check analysis freshness
       checkAnalysisFreshness();
-      
+
       // If no analysis or stale analysis, redirect to analyze page
-      if (!analysis || (analysisStale && repoData.analysisStatus !== 'analyzing')) {
-        setTimeout(() => goto('/analyze'), 1000);
+      if (
+        !analysis ||
+        (analysisStale && repoData.analysisStatus !== "analyzing")
+      ) {
+        setTimeout(() => goto("/analyze"), 1000);
         return;
       }
-      
     } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to load repository';
-      setTimeout(() => goto('/'), 3000);
+      error = err instanceof Error ? err.message : "Failed to load repository";
+      setTimeout(() => goto("/"), 3000);
     } finally {
       loading = false;
     }
@@ -81,46 +79,46 @@
     const lastAnalyzed = new Date(repo.lastAnalyzed);
     const githubUpdated = new Date(repo.githubPushedAt);
     const now = new Date();
-    
+
     // Analysis is stale ONLY if GitHub repo was updated after our last analysis
     analysisStale = githubUpdated > lastAnalyzed;
-    
+
     // Calculate age string for display purposes
     const ageMs = now.getTime() - lastAnalyzed.getTime();
     const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
     const ageDays = Math.floor(ageHours / 24);
-    
+
     if (ageDays > 0) {
-      analysisAge = `${ageDays} day${ageDays > 1 ? 's' : ''} ago`;
+      analysisAge = `${ageDays} day${ageDays > 1 ? "s" : ""} ago`;
     } else if (ageHours > 0) {
-      analysisAge = `${ageHours} hour${ageHours > 1 ? 's' : ''} ago`;
+      analysisAge = `${ageHours} hour${ageHours > 1 ? "s" : ""} ago`;
     } else {
-      analysisAge = 'Recently';
+      analysisAge = "Recently";
     }
   }
 
   // Navigation structure prioritizing documentation
   const navigationSections = $derived([
-    { 
-      title: 'Documentation', 
-      url: `/repo/${repoId}/docs`, 
-      icon: 'library-outline',
+    {
+      title: "Documentation",
+      url: `/repo/${repoId}/docs`,
+      icon: "library-outline",
       primary: true,
       expandable: true,
-      expanded: subsystemsExpanded
+      expanded: subsystemsExpanded,
     },
-    { 
-      title: 'Chat with Iris', 
-      url: `/repo/${repoId}`, 
-      icon: 'chatbubbles-outline',
-      primary: false
+    {
+      title: "Chat with Iris",
+      url: `/repo/${repoId}`,
+      icon: "chatbubbles-outline",
+      primary: false,
     },
-    { 
-      title: 'Architecture', 
-      url: `/repo/${repoId}/graph`, 
-      icon: 'git-network-outline',
-      primary: false
-    }
+    {
+      title: "Architecture",
+      url: `/repo/${repoId}/graph`,
+      icon: "git-network-outline",
+      primary: false,
+    },
   ]);
 
   // Get subsystems for documentation menu
@@ -144,13 +142,13 @@
 
   const handleRefreshAnalysis = async () => {
     if (!repo || refreshing) return;
-    
+
     refreshing = true;
     try {
       // Redirect to analyze page with the repository URL
-      goto('/analyze', { state: { repositoryUrl: repo.url } });
+      goto("/analyze", { state: { repositoryUrl: repo.url } });
     } catch (err) {
-      console.error('Failed to refresh analysis:', err);
+      console.error("Failed to refresh analysis:", err);
     } finally {
       refreshing = false;
     }
@@ -161,29 +159,29 @@
   };
 
   const formatTimestamp = (timestamp: string): string => {
-    return new Date(timestamp).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+    return new Date(timestamp).toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
     });
   };
 
   const getFrameworkColor = (framework: string): string => {
     const colors: Record<string, string> = {
-      'react': 'primary',
-      'nextjs': 'secondary', 
-      'svelte': 'tertiary',
-      'flask': 'success',
-      'fastapi': 'warning',
-      'unknown': 'medium'
+      react: "primary",
+      nextjs: "secondary",
+      svelte: "tertiary",
+      flask: "success",
+      fastapi: "warning",
+      unknown: "medium",
     };
-    return colors[framework] || 'medium';
+    return colors[framework] || "medium";
   };
 
   const isCurrentSubsystem = (subsystemName: string): boolean => {
-    const pathParts = currentPath.split('/');
+    const pathParts = currentPath.split("/");
     const currentSubsystem = pathParts[pathParts.length - 1];
     return decodeURIComponent(currentSubsystem) === subsystemName;
   };
@@ -212,7 +210,7 @@
           <ion-card-content>
             <p>{error}</p>
             <div class="error-actions">
-              <ion-button fill="outline" onclick={() => goto('/')}>
+              <ion-button fill="outline" onclick={() => goto("/")}>
                 <ion-icon name="home" slot="start"></ion-icon>
                 Return Home
               </ion-button>
@@ -238,27 +236,30 @@
           </ion-title>
         </ion-toolbar>
       </ion-header>
-      
+
       <ion-content>
         <!-- Repository Info Section -->
         <div class="repo-info-section">
           <div class="repo-header">
             <div class="repo-title">
               <h3>{repo.name}</h3>
-              <ion-button 
-                fill="clear" 
-                size="small" 
-                onclick={() => window.open(repo.url, '_blank')}
+              <ion-button
+                fill="clear"
+                size="small"
+                onclick={() => window.open(repo.url, "_blank")}
               >
                 <ion-icon name="logo-github" slot="icon-only"></ion-icon>
               </ion-button>
             </div>
             <div class="repo-meta">
-              <ion-chip color={getFrameworkColor(analysis.framework)} size="small">
+              <ion-chip
+                color={getFrameworkColor(analysis.framework)}
+                size="small"
+              >
                 <ion-label>{analysis.framework}</ion-label>
               </ion-chip>
               <div class="analysis-status">
-                {#if repo.analysisStatus === 'analyzing'}
+                {#if repo.analysisStatus === "analyzing"}
                   <ion-chip color="warning" size="small">
                     <ion-icon name="hourglass-outline"></ion-icon>
                     <ion-label>Analyzing...</ion-label>
@@ -287,19 +288,24 @@
               </div>
               <div class="timestamp">
                 <span class="label">Updated:</span>
-                <span class="value">{formatTimestamp(repo.githubPushedAt).split(',')[0]}</span>
+                <span class="value"
+                  >{formatTimestamp(repo.githubPushedAt).split(",")[0]}</span
+                >
               </div>
             </div>
           </div>
         </div>
-        
+
         <!-- Main Navigation -->
         <ion-list class="navigation-list">
           {#each navigationSections as section}
             <div class="nav-section">
-              <ion-item 
-                button 
-                onclick={() => section.expandable ? toggleSubsystems() : handleNavClick(section.url)}
+              <ion-item
+                button
+                onclick={() =>
+                  section.expandable
+                    ? toggleSubsystems()
+                    : handleNavClick(section.url)}
                 class:selected={currentPath.startsWith(section.url)}
                 class:primary={section.primary}
               >
@@ -307,25 +313,28 @@
                 <ion-label class="nav-label">
                   <div class="nav-title">{section.title}</div>
                   {#if section.primary}
-                    <div class="nav-subtitle">{subsystems.length} subsystems</div>
+                    <div class="nav-subtitle">
+                      {subsystems.length} subsystems
+                    </div>
                   {/if}
                 </ion-label>
                 {#if section.expandable}
-                  <ion-icon 
-                    name={subsystemsExpanded ? 'chevron-up' : 'chevron-down'} 
+                  <ion-icon
+                    name={subsystemsExpanded ? "chevron-up" : "chevron-down"}
                     slot="end"
                   ></ion-icon>
                 {:else}
-                  <ion-icon name="arrow-forward" slot="end" class="nav-arrow"></ion-icon>
+                  <ion-icon name="arrow-forward" slot="end" class="nav-arrow"
+                  ></ion-icon>
                 {/if}
               </ion-item>
-              
+
               <!-- Subsystems submenu for Documentation -->
               {#if section.expandable && subsystemsExpanded && subsystems.length > 0}
                 <div class="subsystems-menu">
                   {#each subsystems as subsystem}
-                    <ion-item 
-                      button 
+                    <ion-item
+                      button
                       class="subsystem-item"
                       class:selected={isCurrentSubsystem(subsystem.name)}
                       onclick={() => handleSubsystemClick(subsystem.name)}
@@ -333,7 +342,9 @@
                       <ion-icon name="layers-outline" slot="start"></ion-icon>
                       <ion-label>
                         <div class="subsystem-name">{subsystem.name}</div>
-                        <div class="subsystem-info">{subsystem.files.length} files</div>
+                        <div class="subsystem-info">
+                          {subsystem.files.length} files
+                        </div>
                       </ion-label>
                     </ion-item>
                   {/each}
@@ -342,28 +353,36 @@
             </div>
           {/each}
         </ion-list>
-        
+
         <!-- Quick Actions -->
         <ion-list class="actions-list">
           <ion-list-header>
             <ion-label>Actions</ion-label>
           </ion-list-header>
-          
-          <ion-item 
-            button 
+
+          <ion-item
+            button
             onclick={handleRefreshAnalysis}
             disabled={refreshing}
           >
-            <ion-icon name={refreshing ? 'hourglass-outline' : 'refresh-outline'} slot="start"></ion-icon>
-            <ion-label>{refreshing ? 'Refreshing...' : 'Refresh Analysis'}</ion-label>
+            <ion-icon
+              name={refreshing ? "hourglass-outline" : "refresh-outline"}
+              slot="start"
+            ></ion-icon>
+            <ion-label
+              >{refreshing ? "Refreshing..." : "Refresh Analysis"}</ion-label
+            >
           </ion-item>
-          
-          <ion-item button onclick={() => goto('/')}>
+
+          <ion-item button onclick={() => goto("/")}>
             <ion-icon name="add-outline" slot="start"></ion-icon>
             <ion-label>Analyze New Repository</ion-label>
           </ion-item>
-          
-          <ion-item button onclick={() => navigator.share?.({ url: window.location.href })}>
+
+          <ion-item
+            button
+            onclick={() => navigator.share?.({ url: window.location.href })}
+          >
             <ion-icon name="share-outline" slot="start"></ion-icon>
             <ion-label>Share Repository</ion-label>
           </ion-item>
@@ -378,7 +397,7 @@
           <ion-buttons slot="start">
             <ion-menu-button></ion-menu-button>
           </ion-buttons>
-          
+
           <ion-title>
             <div class="header-title">
               <span class="repo-name">{repo.fullName}</span>
@@ -389,7 +408,7 @@
                     <ion-label>Analysis may be outdated</ion-label>
                   </ion-chip>
                 {/if}
-                {#if repo.analysisStatus === 'analyzing'}
+                {#if repo.analysisStatus === "analyzing"}
                   <ion-chip color="primary" size="small">
                     <ion-icon name="sync-outline"></ion-icon>
                     <ion-label>Analysis in progress</ion-label>
@@ -398,20 +417,20 @@
               </div>
             </div>
           </ion-title>
-          
+
           <ion-buttons slot="end">
-            <ion-button 
-              fill="clear" 
-              onclick={() => window.open(repo.url, '_blank')}
+            <ion-button
+              fill="clear"
+              onclick={() => window.open(repo.url, "_blank")}
               title="View on GitHub"
             >
               <ion-icon name="logo-github" slot="icon-only"></ion-icon>
             </ion-button>
-            
-            {#if analysisStale && repo.analysisStatus !== 'analyzing'}
-              <ion-button 
-                fill="clear" 
-                color="warning" 
+
+            {#if analysisStale && repo.analysisStatus !== "analyzing"}
+              <ion-button
+                fill="clear"
+                color="warning"
                 onclick={handleRefreshAnalysis}
                 title="Refresh Analysis"
               >
@@ -421,7 +440,7 @@
           </ion-buttons>
         </ion-toolbar>
       </ion-header>
-      
+
       {@render children()}
     </div>
   </ion-split-pane>
@@ -429,7 +448,8 @@
 
 <style lang="scss">
   // Loading and Error States
-  .loading-layout, .error-layout {
+  .loading-layout,
+  .error-layout {
     height: 100vh;
     display: flex;
     align-items: center;

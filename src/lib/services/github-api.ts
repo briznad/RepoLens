@@ -2,16 +2,16 @@ import type {
   RepoData,
   FileTree,
   GitHubFileContent,
-  AnalysisResult,
   GitHubRateLimit,
   GitHubApiResponse
-} from '$types';
+} from '$types/repository';
+import type { AnalysisResult } from '$types/analysis';
 
 import {
   GitHubApiError,
   GitHubRateLimitError,
   GitHubRepoNotFoundError
-} from '$types';
+} from '$types/error';
 
 import { analyzeRepo } from '$utilities/repo-analyzer';
 
