@@ -1,16 +1,18 @@
 <script lang="ts">
-  import type { AnalysisResult, RepoData, FirestoreRepo } from "$lib/types";
+  import type { AnalysisResult } from "$types/analysis";
+  import type { RepoData } from "$types/repository";
   import { onMount } from "svelte";
   import { page } from "$app/stores";
   import { goto } from "$app/navigation";
-  import { parseGitHubUrl, fetchRepo } from "$lib/github";
-  import { 
-    findOrCreateRepo, 
-    checkRepoFreshness, 
-    updateRepoWithAnalysis, 
-    getRepoById, 
-    updateAnalysisStatus 
-  } from "$lib/services/repository";
+  import { parseGitHubUrl } from "$utilities/github-utils";
+  import { fetchRepo } from "$services/github-api";
+  import {
+    findOrCreateRepo,
+    checkRepoFreshness,
+    updateRepoWithAnalysis,
+    getRepoById,
+    updateAnalysisStatus,
+  } from "$services/repository";
 
   let repoUrl = $state("");
   let repoDocId = $state("");
@@ -40,7 +42,7 @@
 
       // Step 1: Check repository freshness
       updateProgress(0);
-      await updateAnalysisStatus(repoDocId, 'analyzing');
+      await updateAnalysisStatus(repoDocId, "analyzing");
       await new Promise((resolve) => setTimeout(resolve, 500));
 
       // Step 2: Fetch latest GitHub data
@@ -54,7 +56,7 @@
         skipAnalysis = true;
         updateProgress(5, "Repository is up to date!");
         isComplete = true;
-        
+
         // Redirect to results
         setTimeout(() => {
           goto(`/repo/${repoDocId}`);
@@ -91,14 +93,27 @@
     } catch (err) {
       // Handle specific error types
       if (err instanceof Error) {
-        if (err.message.includes("Repository not found") || err.message.includes("404")) {
-          error = "Repository not found or is private. Please check that the repository exists and is publicly accessible.";
-        } else if (err.message.includes("rate limit") || err.message.includes("403")) {
-          error = "GitHub API rate limit exceeded. Please try again in a few minutes.";
-        } else if (err.message.includes("network") || err.message.includes("fetch")) {
-          error = "Network error occurred. Please check your connection and try again.";
+        if (
+          err.message.includes("Repository not found") ||
+          err.message.includes("404")
+        ) {
+          error =
+            "Repository not found or is private. Please check that the repository exists and is publicly accessible.";
+        } else if (
+          err.message.includes("rate limit") ||
+          err.message.includes("403")
+        ) {
+          error =
+            "GitHub API rate limit exceeded. Please try again in a few minutes.";
+        } else if (
+          err.message.includes("network") ||
+          err.message.includes("fetch")
+        ) {
+          error =
+            "Network error occurred. Please check your connection and try again.";
         } else if (err.message.includes("timeout")) {
-          error = "Request timed out. The repository might be too large. Please try again.";
+          error =
+            "Request timed out. The repository might be too large. Please try again.";
         } else if (err.message.includes("Invalid GitHub URL")) {
           error = "Invalid repository URL. Please check the URL format.";
         } else {
@@ -107,13 +122,13 @@
       } else {
         error = "Analysis failed due to an unexpected error. Please try again.";
       }
-      
+
       analysisStep = "Analysis failed";
 
       // Update Firestore with failure status
       try {
         if (repoDocId) {
-          await updateAnalysisStatus(repoDocId, 'failed', error);
+          await updateAnalysisStatus(repoDocId, "failed", error);
         }
       } catch (firestoreErr) {
         console.error("Failed to update Firestore status:", firestoreErr);
@@ -129,7 +144,8 @@
       repoDocId = $page.url.searchParams.get("docId") || "";
 
       if (!repoUrl) {
-        error = "No repository URL provided. Please return to the home page and enter a valid GitHub repository URL.";
+        error =
+          "No repository URL provided. Please return to the home page and enter a valid GitHub repository URL.";
         return;
       }
 
@@ -137,7 +153,10 @@
       try {
         parseGitHubUrl(repoUrl);
       } catch (err) {
-        error = err instanceof Error ? err.message : "Invalid GitHub repository URL format";
+        error =
+          err instanceof Error
+            ? err.message
+            : "Invalid GitHub repository URL format";
         return;
       }
 
@@ -149,7 +168,8 @@
         } catch (err) {
           if (err instanceof Error) {
             if (err.message.includes("Invalid GitHub URL")) {
-              error = "Invalid repository URL. Please check the URL format and try again.";
+              error =
+                "Invalid repository URL. Please check the URL format and try again.";
             } else if (err.message.includes("rate limit")) {
               error = "GitHub API rate limit exceeded. Please try again later.";
             } else {
@@ -165,12 +185,13 @@
       // Verify repository exists in Firestore
       const firestoreRepo = await getRepoById(repoDocId);
       if (!firestoreRepo) {
-        error = "Repository not found in database. This may be a system error - please try again.";
+        error =
+          "Repository not found in database. This may be a system error - please try again.";
         return;
       }
 
       // Check if analysis is already in progress by another process
-      if (firestoreRepo.analysisStatus === 'analyzing') {
+      if (firestoreRepo.analysisStatus === "analyzing") {
         analysisStep = "Analysis already in progress...";
         // Wait a bit and redirect to results page
         setTimeout(() => {
@@ -181,12 +202,14 @@
 
       // Start analysis
       performAnalysis();
-      
     } catch (err) {
       if (err instanceof Error) {
         if (err.message.includes("network") || err.message.includes("fetch")) {
           error = "Network error. Please check your connection and try again.";
-        } else if (err.message.includes("permission") || err.message.includes("auth")) {
+        } else if (
+          err.message.includes("permission") ||
+          err.message.includes("auth")
+        ) {
           error = "Database access error. Please try again later.";
         } else {
           error = `Initialization failed: ${err.message}`;
@@ -228,7 +251,7 @@
                 <ion-icon name="arrow-back-outline" slot="start"></ion-icon>
                 Try Another Repository
               </ion-button>
-              {#if error.includes('rate limit') || error.includes('API')}
+              {#if error.includes("rate limit") || error.includes("API")}
                 <ion-button
                   fill="clear"
                   color="medium"
