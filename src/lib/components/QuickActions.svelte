@@ -1,20 +1,23 @@
 <script lang="ts">
+  import type { FirestoreRepo } from "$types/repository";
+
   import {
     addOutline,
     shareOutline,
     hourglassOutline,
     refreshOutline,
   } from "ionicons/icons";
+  import { handleEnterKey } from "$utilities/helper";
 
   interface Props {
+    repo: FirestoreRepo;
     refreshing: boolean;
-    onRefreshAnalysis: () => void;
     onShare?: () => void;
   }
 
   let {
+    repo,
     refreshing,
-    onRefreshAnalysis,
     onShare = () => navigator.share?.({ url: window.location.href }),
   }: Props = $props();
 </script>
@@ -31,17 +34,28 @@
 
   <ion-item
     button
-    onclick={onRefreshAnalysis}
+    href="/analyze?docId={repo.id}"
+    role="button"
+    tabindex="0"
     disabled={refreshing}
     detail={false}
   >
     <ion-icon icon={refreshing ? hourglassOutline : refreshOutline} slot="start"
     ></ion-icon>
+
     <ion-label>{refreshing ? "Refreshing..." : "Refresh Analysis"}</ion-label>
   </ion-item>
 
-  <ion-item button onclick={onShare} detail={false}>
+  <ion-item
+    button
+    onclick={onShare}
+    onkeydown={handleEnterKey(onShare)}
+    detail={false}
+    role="button"
+    tabindex="0"
+  >
     <ion-icon icon={shareOutline} slot="start"></ion-icon>
+
     <ion-label>Share Repository</ion-label>
   </ion-item>
 </ion-list>

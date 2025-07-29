@@ -1,25 +1,20 @@
 <script lang="ts">
+  import type { FirestoreRepo } from "$types/repository";
+
   import {
     logoGithub,
     warningOutline,
     syncOutline,
     refreshOutline,
   } from "ionicons/icons";
-  import type { FirestoreRepo } from "$types/repository";
 
   interface Props {
     repo: FirestoreRepo;
     analysisStale: boolean;
     refreshing?: boolean;
-    onRefreshAnalysis?: () => void;
   }
 
-  let {
-    repo,
-    analysisStale,
-    refreshing = false,
-    onRefreshAnalysis = () => {},
-  }: Props = $props();
+  let { repo, analysisStale, refreshing = false }: Props = $props();
 </script>
 
 <ion-toolbar>
@@ -61,7 +56,7 @@
       <ion-button
         fill="clear"
         color="warning"
-        onclick={onRefreshAnalysis}
+        href="/analyze?docId={repo.id}"
         title="Refresh Analysis"
         disabled={refreshing}
       >
