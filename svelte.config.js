@@ -21,7 +21,6 @@ const config = {
 			'firebase/ga'   : './node_modules/firebase/analytics',
 
 			// file path shortcuts
-			'$actions'    : './src/lib/actions',
 			'$components' : './src/lib/components',
 			'$services'   : './src/lib/services',
 			'$stores'     : './src/lib/stores',
