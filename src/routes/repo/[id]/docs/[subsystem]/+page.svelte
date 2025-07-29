@@ -13,20 +13,20 @@
     FileInterface,
     CitationLink,
   } from "$types/analysis";
+  import SubsystemLoadingState from '$components/subsystem/LoadingState.svelte';
+  import SubsystemErrorCard from '$components/subsystem/ErrorCard.svelte';
+  import SubsystemBreadcrumb from '$components/subsystem/Breadcrumb.svelte';
+  import SubsystemHeader from '$components/subsystem/Header.svelte';
+  import AIGenerationStatus from '$components/AIGenerationStatus.svelte';
+  import SubsystemOverview from '$components/subsystem/Overview.svelte';
   import { 
-    arrowBack, 
-    home, 
-    layersOutline, 
-    codeOutline, 
-    logoGithub, 
-    informationCircleOutline, 
-    arrowForwardCircleOutline, 
-    openOutline, 
     folderOutline, 
     codeSlashOutline, 
     codeWorkingOutline, 
     gitNetworkOutline, 
-    arrowForward 
+    arrowForward,
+    logoGithub,
+    openOutline
   } from 'ionicons/icons';
 
   const repoId = $derived($page.params.id);
@@ -353,185 +353,41 @@ Focus on architectural concepts and system design.`;
 
 <ion-content class="ion-padding">
   {#if loading}
-    <div class="loading-container">
-      <ion-spinner name="dots"></ion-spinner>
-      <p>Loading subsystem documentation...</p>
-    </div>
+    <SubsystemLoadingState />
   {:else if error}
-    <ion-card class="error-card">
-      <ion-card-header>
-        <ion-card-title color="danger">Error</ion-card-title>
-      </ion-card-header>
-      <ion-card-content>
-        <p>{error}</p>
-        <div class="error-actions">
-          <ion-button
-            fill="outline"
-            onclick={() => goto(`/repo/${repoId}/docs`)}
-          >
-            <ion-icon icon={arrowBack} slot="start"></ion-icon>
-            Back to Docs
-          </ion-button>
-          <ion-button fill="outline" onclick={() => goto("/")}>
-            <ion-icon icon={home} slot="start"></ion-icon>
-            Return Home
-          </ion-button>
-        </div>
-      </ion-card-content>
-    </ion-card>
+    <SubsystemErrorCard {error} {repoId} />
   {:else if repo && analysis && subsystem}
     <div class="subsystem-docs-container">
       <!-- Breadcrumb Navigation -->
-      <div class="breadcrumb-nav">
-        <ion-breadcrumbs>
-          <ion-breadcrumb onclick={() => goto("/")}>
-            <ion-icon icon={home}></ion-icon>
-            Home
-          </ion-breadcrumb>
-          <ion-breadcrumb onclick={() => goto(`/repo/${repoId}/docs`)}>
-            {repo.fullName}
-          </ion-breadcrumb>
-          <ion-breadcrumb>
-            {subsystemName}
-          </ion-breadcrumb>
-        </ion-breadcrumbs>
-      </div>
+      <SubsystemBreadcrumb 
+        repoName={repo.fullName}
+        {subsystemName}
+        {repoId}
+        onHomeClick={() => goto("/")}
+        onRepoClick={() => goto(`/repo/${repoId}/docs`)}
+      />
 
       <!-- Header Section -->
-      <div class="header-section">
-        <ion-card class="header-card">
-          <ion-card-content>
-            <div class="subsystem-header">
-              <div class="header-info">
-                <h1 class="subsystem-title">{subsystemName}</h1>
-                <div class="subsystem-meta">
-                  <ion-chip color="primary">
-                    <ion-icon icon={layersOutline}></ion-icon>
-                    <ion-label>{subsystem.files.length} files</ion-label>
-                  </ion-chip>
-                  <ion-chip color="secondary">
-                    <ion-icon icon={codeOutline}></ion-icon>
-                    <ion-label>{analysis.framework}</ion-label>
-                  </ion-chip>
-                  {#if subsystemDescription?.technologies}
-                    {#each subsystemDescription.technologies.slice(0, 3) as tech}
-                      <ion-chip color="tertiary" size="small">
-                        <ion-label>{tech}</ion-label>
-                      </ion-chip>
-                    {/each}
-                  {/if}
-                </div>
-                {#if subsystemDescription?.description}
-                  <p class="subsystem-intro">
-                    {subsystemDescription.description}
-                  </p>
-                {:else}
-                  <p class="subsystem-intro fallback">
-                    {subsystem.description}
-                  </p>
-                {/if}
-              </div>
-              <div class="header-actions">
-                <ion-button
-                  fill="outline"
-                  onclick={() => window.open(repo?.url || "", "_blank")}
-                >
-                  <ion-icon icon={logoGithub} slot="start"></ion-icon>
-                  View Repository
-                </ion-button>
-              </div>
-            </div>
-          </ion-card-content>
-        </ion-card>
-      </div>
+      <SubsystemHeader 
+        {subsystemName}
+        fileCount={subsystem.files.length}
+        framework={analysis.framework}
+        {subsystemDescription}
+        fallbackDescription={subsystem.description}
+        repoUrl={repo?.url}
+      />
 
       <!-- AI Generation Status -->
-      {#if generatingAI}
-        <ion-card class="ai-status-card">
-          <ion-card-content>
-            <div class="ai-status">
-              <ion-spinner name="crescent"></ion-spinner>
-              <span>Generating enhanced documentation with AI...</span>
-            </div>
-          </ion-card-content>
-        </ion-card>
-      {/if}
+      <AIGenerationStatus isGenerating={generatingAI} />
 
       <!-- Overview Section -->
-      <ion-card class="section-card">
-        <ion-card-header>
-          <div class="section-header" onclick={() => toggleSection("overview")}>
-            <ion-card-title>
-              <ion-icon icon={informationCircleOutline}></ion-icon>
-              Overview & Architecture Role
-            </ion-card-title>
-            <ion-icon
-              name={expandedSections.has("overview")
-                ? "chevron-up"
-                : "chevron-down"}
-            ></ion-icon>
-          </div>
-        </ion-card-header>
-
-        {#if expandedSections.has("overview")}
-          <ion-card-content>
-            {#if subsystemDescription}
-              <div class="overview-content">
-                <div class="overview-item">
-                  <h4>Purpose</h4>
-                  <p>{subsystemDescription.purpose}</p>
-                </div>
-
-                {#if architectureRole}
-                  <div class="overview-item">
-                    <h4>Architecture Role</h4>
-                    <p>{architectureRole}</p>
-                  </div>
-                {/if}
-
-                {#if subsystemDescription.entryPoints.length > 0}
-                  <div class="overview-item">
-                    <h4>Entry Points</h4>
-                    <div class="entry-points">
-                      {#each subsystemDescription.entryPoints as entryPoint}
-                        <ion-chip color="success" class="entry-chip">
-                          <ion-icon icon={arrowForwardCircleOutline}
-                          ></ion-icon>
-                          <ion-label>{entryPoint}</ion-label>
-                          <a
-                            href={createGitHubLink(entryPoint)}
-                            target="_blank"
-                            rel="noopener"
-                          >
-                            <ion-icon icon={openOutline}></ion-icon>
-                          </a>
-                        </ion-chip>
-                      {/each}
-                    </div>
-                  </div>
-                {/if}
-
-                {#if subsystemDescription.dependencies.length > 0}
-                  <div class="overview-item">
-                    <h4>Key Dependencies</h4>
-                    <div class="dependencies">
-                      {#each subsystemDescription.dependencies as dep}
-                        <ion-chip size="small" color="medium">
-                          <ion-label>{dep}</ion-label>
-                        </ion-chip>
-                      {/each}
-                    </div>
-                  </div>
-                {/if}
-              </div>
-            {:else}
-              <p class="fallback-content">
-                Basic subsystem information is being processed...
-              </p>
-            {/if}
-          </ion-card-content>
-        {/if}
-      </ion-card>
+      <SubsystemOverview 
+        {subsystemDescription}
+        {architectureRole}
+        expanded={expandedSections.has("overview")}
+        onToggle={() => toggleSection("overview")}
+        onCreateGitHubLink={createGitHubLink}
+      />
 
       <!-- Files Section -->
       <ion-card class="section-card">

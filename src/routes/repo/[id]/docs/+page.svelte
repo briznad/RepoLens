@@ -14,11 +14,11 @@
   
   import LoadingState from "$components/LoadingState.svelte";
   import ErrorCard from "$components/ErrorCard.svelte";
-  import RepoHeader from "$components/RepoHeader.svelte";
+  import RepoHeader from "$components/repo/Header.svelte";
   import StatCard from "$components/StatCard.svelte";
   import LanguageDistribution from "$components/LanguageDistribution.svelte";
   import SearchAndFilter from "$components/SearchAndFilter.svelte";
-  import SubsystemGrid from "$components/SubsystemGrid.svelte";
+  import SubsystemGrid from "$components/subsystem/Grid.svelte";
   import FileList from "$components/FileList.svelte";
   import { documentOutline, settingsOutline, documentTextOutline, informationCircleOutline, home } from 'ionicons/icons';
 

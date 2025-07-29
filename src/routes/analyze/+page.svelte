@@ -13,7 +13,10 @@
     getRepoById,
     updateAnalysisStatus,
   } from "$services/repository";
-  import { alertCircle, arrowBackOutline, refreshOutline, checkmarkCircle, ellipseOutline } from 'ionicons/icons';
+  import AnalysisProgress from '$components/analysis/Progress.svelte';
+  import AnalysisStatus from '$components/analysis/Status.svelte';
+  import AnalysisSteps from '$components/analysis/Steps.svelte';
+  import AnalysisError from '$components/analysis/Error.svelte';
 
   let repoUrl = $state("");
   let repoDocId = $state("");
@@ -236,97 +239,16 @@
 
       <ion-card-content>
         {#if error}
-          <!-- Error State -->
-          <div class="error-section">
-            <ion-icon icon={alertCircle} color="danger" class="error-icon"
-            ></ion-icon>
-            <h3 class="error-title">Analysis Failed</h3>
-            <p class="error-message">{error}</p>
-            <div class="error-actions">
-              <ion-button
-                fill="outline"
-                color="primary"
-                onclick={() => goto("/")}
-                class="retry-button"
-              >
-                <ion-icon icon={arrowBackOutline} slot="start"></ion-icon>
-                Try Another Repository
-              </ion-button>
-              {#if error.includes("rate limit") || error.includes("API")}
-                <ion-button
-                  fill="clear"
-                  color="medium"
-                  onclick={() => initializeAnalysis()}
-                  class="retry-button"
-                >
-                  <ion-icon icon={refreshOutline} slot="start"></ion-icon>
-                  Retry Analysis
-                </ion-button>
-              {/if}
-            </div>
-          </div>
+          <AnalysisError 
+            {error}
+            onGoHome={() => goto("/")}
+            onRetry={() => initializeAnalysis()}
+            showRetry={error.includes("rate limit") || error.includes("API")}
+          />
         {:else}
-          <!-- Progress State -->
-          <div class="progress-section">
-            <ion-progress-bar
-              value={progress / 100}
-              color={isComplete ? "success" : "primary"}
-            ></ion-progress-bar>
-            <p class="progress-text">
-              {Math.round(progress)}% Complete
-              {#if isComplete}
-                <ion-icon
-                  name="checkmark-circle"
-                  color="success"
-                  class="complete-icon"
-                ></ion-icon>
-              {/if}
-            </p>
-          </div>
-
-          <div class="status-section">
-            <ion-item>
-              {#if isComplete}
-                <ion-icon icon={checkmarkCircle} color="success" slot="start"
-                ></ion-icon>
-              {:else}
-                <ion-spinner name="crescent" slot="start"></ion-spinner>
-              {/if}
-              <ion-label>{analysisStep}</ion-label>
-            </ion-item>
-          </div>
-
-          <div class="steps-section">
-            <h3>Analysis Steps:</h3>
-            {#each analysisSteps as step, index}
-              {@const stepProgress = ((index + 1) / analysisSteps.length) * 100}
-              {@const isStepComplete = progress >= stepProgress}
-              {@const isCurrentStep =
-                progress > (index / analysisSteps.length) * 100 &&
-                progress < stepProgress}
-
-              <ion-item>
-                {#if isStepComplete}
-                  <ion-icon icon={checkmarkCircle} slot="start" color="success"
-                  ></ion-icon>
-                {:else if isCurrentStep}
-                  <ion-spinner name="crescent" slot="start"></ion-spinner>
-                {:else}
-                  <ion-icon icon={ellipseOutline} slot="start" color="medium"
-                  ></ion-icon>
-                {/if}
-                <ion-label
-                  color={isStepComplete
-                    ? "success"
-                    : isCurrentStep
-                      ? "primary"
-                      : "medium"}
-                >
-                  {step}
-                </ion-label>
-              </ion-item>
-            {/each}
-          </div>
+          <AnalysisProgress {progress} {isComplete} />
+          <AnalysisStatus {analysisStep} {isComplete} />
+          <AnalysisSteps steps={analysisSteps} {progress} />
         {/if}
       </ion-card-content>
     </ion-card>
@@ -358,62 +280,4 @@
     margin-bottom: 20px;
   }
 
-  .progress-section {
-    margin-bottom: 30px;
-  }
-
-  .progress-text {
-    text-align: center;
-    margin-top: 10px;
-    font-weight: 500;
-  }
-
-  .status-section {
-    margin-bottom: 30px;
-  }
-
-  .steps-section h3 {
-    margin: 20px 0 10px 0;
-    font-size: 1.2rem;
-    color: var(--ion-color-dark);
-  }
-
-  .error-section {
-    text-align: center;
-    padding: 20px;
-  }
-
-  .error-icon {
-    font-size: 4rem;
-    margin-bottom: 20px;
-  }
-
-  .error-title {
-    color: var(--ion-color-danger);
-    margin-bottom: 16px;
-    font-size: 1.5rem;
-  }
-
-  .error-message {
-    color: var(--ion-color-medium);
-    margin-bottom: 24px;
-    line-height: 1.5;
-  }
-
-  .error-actions {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-    flex-wrap: wrap;
-    margin-top: 16px;
-  }
-
-  .retry-button {
-    margin-top: 8px;
-  }
-
-  .complete-icon {
-    margin-left: 8px;
-    font-size: 1.2rem;
-  }
 </style>

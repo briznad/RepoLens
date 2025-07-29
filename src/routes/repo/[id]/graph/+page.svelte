@@ -6,7 +6,12 @@
   import { makeOpenAIRequest } from "$services/ai-analyzer";
   import type { FirestoreRepo } from "$types/repository";
   import type { AnalysisResult, Subsystem, Framework } from "$types/analysis";
-  import { warningOutline, libraryOutline, refresh, download, sparklesOutline, eye, eyeOff } from 'ionicons/icons';
+  import GraphLoadingState from '$components/graph/LoadingState.svelte';
+  import GraphErrorCard from '$components/graph/ErrorCard.svelte';
+  import GraphControls from '$components/graph/Controls.svelte';
+  import DiagramVisualization from '$components/graph/Visualization.svelte';
+  import ArchitectureDescription from '$components/ArchitectureDescription.svelte';
+  import DiagramLegend from '$components/graph/Legend.svelte';
 
   const repoId = $derived($page.params.id);
 
@@ -406,348 +411,45 @@ The architecture follows common ${analysis.framework} patterns with clear separa
 </script>
 
 {#if loading}
-  <ion-content class="ion-padding">
-    <div class="loading-container">
-      <ion-spinner name="dots"></ion-spinner>
-      <p>Loading repository architecture...</p>
-    </div>
-  </ion-content>
+  <GraphLoadingState />
 {:else if error}
-  <ion-content class="ion-padding">
-    <div class="error-container">
-      <ion-card class="error-card">
-        <ion-card-header>
-          <ion-card-title color="danger">
-            <ion-icon icon={warningOutline}></ion-icon>
-            Architecture Unavailable
-          </ion-card-title>
-        </ion-card-header>
-        <ion-card-content>
-          <p>{error}</p>
-          <div class="error-actions">
-            <ion-button
-              fill="outline"
-              onclick={() => goto(`/repo/${repoId}/docs`)}
-            >
-              <ion-icon icon={libraryOutline} slot="start"></ion-icon>
-              View Documentation
-            </ion-button>
-            <ion-button fill="solid" onclick={() => window.location.reload()}>
-              <ion-icon icon={refresh} slot="start"></ion-icon>
-              Retry
-            </ion-button>
-          </div>
-        </ion-card-content>
-      </ion-card>
-    </div>
-  </ion-content>
+  <GraphErrorCard {error} {repoId} />
 {:else if repo && analysis}
   <ion-content class="ion-padding">
     <div class="graph-container">
       <!-- Header Controls -->
-      <ion-card class="controls-card">
-        <ion-card-header>
-          <ion-card-title>Repository Architecture</ion-card-title>
-          <ion-card-subtitle
-            >{repo.fullName} - {analysis.framework} ({analysis.subsystems
-              .length} subsystems)</ion-card-subtitle
-          >
-        </ion-card-header>
-
-        <ion-card-content>
-          <ion-item>
-            <ion-select
-              label="View Type"
-              label-placement="stacked"
-              value={selectedView}
-              onionChange={handleViewChange}
-            >
-              {#each views as view}
-                <ion-select-option value={view.value}
-                  >{view.label}</ion-select-option
-                >
-              {/each}
-            </ion-select>
-          </ion-item>
-
-          <div class="control-buttons">
-            <ion-button size="small" fill="outline" onclick={downloadDiagram}>
-              <ion-icon icon={download} slot="start"></ion-icon>
-              Export PNG
-            </ion-button>
-            <ion-button
-              size="small"
-              fill="outline"
-              onclick={() => (showLegend = !showLegend)}
-            >
-              <ion-icon icon={showLegend ? eyeOff : eye} slot="start"
-              ></ion-icon>
-              {showLegend ? "Hide" : "Show"} Legend
-            </ion-button>
-            <ion-button
-              size="small"
-              fill="outline"
-              onclick={() => switchDiagramType(diagramType)}
-            >
-              <ion-icon icon={refresh} slot="start"></ion-icon>
-              Refresh
-            </ion-button>
-          </div>
-        </ion-card-content>
-      </ion-card>
+      <GraphControls 
+        subtitle="{repo.fullName} - {analysis.framework} ({analysis.subsystems.length} subsystems)"
+        {views}
+        {selectedView}
+        {showLegend}
+        onViewChange={handleViewChange}
+        onDownload={downloadDiagram}
+        onToggleLegend={() => showLegend = !showLegend}
+        onRefresh={() => switchDiagramType(diagramType)}
+      />
 
       <!-- Graph Visualization Area -->
-      <ion-card class="graph-card">
-        <div class="diagram-container" bind:this={diagramContainer}>
-          {#if !mermaidDiagram}
-            <div class="diagram-placeholder">
-              <ion-spinner name="dots"></ion-spinner>
-              <p>Generating architecture diagram...</p>
-            </div>
-          {/if}
-        </div>
-      </ion-card>
+      <DiagramVisualization bind:diagramContainer {mermaidDiagram} />
 
       <!-- AI Architecture Description -->
-      {#if architectureDescription || generatingDescription}
-        <ion-card class="description-card">
-          <ion-card-header>
-            <ion-card-title>
-              <ion-icon icon={sparklesOutline}></ion-icon>
-              Architecture Analysis
-            </ion-card-title>
-          </ion-card-header>
-
-          <ion-card-content>
-            {#if generatingDescription}
-              <div class="generating-description">
-                <ion-spinner name="dots"></ion-spinner>
-                <p>Generating AI-powered architecture description...</p>
-              </div>
-            {:else}
-              <div class="architecture-description">
-                {architectureDescription}
-              </div>
-            {/if}
-          </ion-card-content>
-        </ion-card>
-      {/if}
+      <ArchitectureDescription 
+        description={architectureDescription}
+        isGenerating={generatingDescription}
+      />
 
       <!-- Legend -->
       {#if showLegend}
-        <ion-card class="legend-card">
-          <ion-card-header>
-            <ion-card-title>Diagram Legend</ion-card-title>
-          </ion-card-header>
-
-          <ion-card-content>
-            <div class="legend-items">
-              <div class="legend-item">
-                <div class="legend-icon">🚪</div>
-                <span>Entry Points - Routes, Pages, Endpoints</span>
-              </div>
-              <div class="legend-item">
-                <div class="legend-icon">🎨</div>
-                <span>UI Components - Views, Templates</span>
-              </div>
-              <div class="legend-item">
-                <div class="legend-icon">⚙️</div>
-                <span>Services - APIs, Stores, Business Logic</span>
-              </div>
-              <div class="legend-item">
-                <div class="legend-icon">📁</div>
-                <span>Other Subsystems - Utils, Config, Tests</span>
-              </div>
-            </div>
-            <p class="legend-note">
-              Click on any subsystem node to view its detailed documentation.
-            </p>
-          </ion-card-content>
-        </ion-card>
+        <DiagramLegend />
       {/if}
     </div>
   </ion-content>
 {/if}
 
 <style lang="scss">
-  // Loading and Error States
-  .loading-container,
-  .error-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 400px;
-    text-align: center;
-
-    p {
-      color: var(--ion-color-medium);
-      font-size: 1rem;
-      margin-top: 16px;
-    }
-  }
-
-  .error-card {
-    max-width: 500px;
-    width: 100%;
-
-    ion-card-title {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 8px;
-    }
-  }
-
-  .error-actions {
-    display: flex;
-    gap: 12px;
-    justify-content: center;
-    margin-top: 16px;
-
-    @media (max-width: 480px) {
-      flex-direction: column;
-    }
-  }
-
   // Main Container
   .graph-container {
     max-width: 1200px;
     margin: 0 auto;
-  }
-
-  // Controls
-  .controls-card {
-    margin-bottom: 20px;
-  }
-
-  .control-buttons {
-    display: flex;
-    gap: 8px;
-    margin-top: 16px;
-    flex-wrap: wrap;
-  }
-
-  // Diagram Area
-  .graph-card {
-    margin-bottom: 20px;
-    min-height: 500px;
-  }
-
-  .diagram-container {
-    min-height: 500px;
-    padding: 20px;
-
-    :global(svg) {
-      width: 100%;
-      height: auto;
-      max-width: 100%;
-    }
-  }
-
-  .diagram-placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-height: 460px;
-    text-align: center;
-    color: var(--ion-color-medium);
-
-    ion-spinner {
-      margin-bottom: 16px;
-    }
-
-    p {
-      margin: 0;
-      font-size: 1rem;
-    }
-  }
-
-  // AI Description
-  .description-card {
-    margin-bottom: 20px;
-
-    ion-card-title {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-  }
-
-  .generating-description {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    color: var(--ion-color-medium);
-
-    p {
-      margin: 0;
-    }
-  }
-
-  .architecture-description {
-    line-height: 1.6;
-    white-space: pre-wrap;
-
-    :global(strong) {
-      font-weight: 600;
-      color: var(--ion-color-dark);
-    }
-  }
-
-  // Legend
-  .legend-card {
-    margin-bottom: 20px;
-  }
-
-  .legend-items {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    margin-bottom: 16px;
-  }
-
-  .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-size: 0.95rem;
-
-    .legend-icon {
-      font-size: 1.2rem;
-      width: 24px;
-      text-align: center;
-      flex-shrink: 0;
-    }
-
-    span {
-      color: var(--ion-color-dark);
-    }
-  }
-
-  .legend-note {
-    font-size: 0.85rem;
-    color: var(--ion-color-medium);
-    font-style: italic;
-    margin: 0;
-    padding-top: 12px;
-    border-top: 1px solid var(--ion-color-light);
-  }
-
-  // Mobile Responsiveness
-  @media (max-width: 768px) {
-    .control-buttons {
-      justify-content: center;
-    }
-
-    .diagram-container {
-      padding: 12px;
-      min-height: 400px;
-    }
-
-    .legend-items {
-      gap: 8px;
-    }
   }
 </style>

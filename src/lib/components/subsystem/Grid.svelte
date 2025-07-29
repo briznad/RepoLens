@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { Subsystem, SubsystemDescription } from '$types/analysis';
-  import SubsystemCard from './SubsystemCard.svelte';
+  import SubsystemCard from './Card.svelte';
   import { layersOutline, folderOpenOutline } from 'ionicons/icons';
 
   interface Props {
