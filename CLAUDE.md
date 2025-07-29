@@ -54,8 +54,7 @@ RepoLens is a SvelteKit web application that provides a clear view of any codeba
 
 #### Key Services
 - **Firebase Service** (`lib/services/firebase.ts`): Initializes Firebase app with environment variables
-- **Firestore Service** (`lib/services/firestore.ts`): Comprehensive database operations for users, lists, recipes, sharing
-- **AI Text Generator** (`lib/utilities/ai-text-generator.ts`): Supports both Anthropic and Google AI providers
+- **Firestore Service** (`lib/services/firestore.ts`): Generic database operations
 
 ### State Management
 - Uses Svelte stores pattern
