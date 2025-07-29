@@ -13,6 +13,7 @@
     getRepoById,
     updateAnalysisStatus,
   } from "$services/repository";
+  import { alertCircle, arrowBackOutline, refreshOutline, checkmarkCircle, ellipseOutline } from 'ionicons/icons';
 
   let repoUrl = $state("");
   let repoDocId = $state("");
@@ -237,7 +238,7 @@
         {#if error}
           <!-- Error State -->
           <div class="error-section">
-            <ion-icon name="alert-circle" color="danger" class="error-icon"
+            <ion-icon icon={alertCircle} color="danger" class="error-icon"
             ></ion-icon>
             <h3 class="error-title">Analysis Failed</h3>
             <p class="error-message">{error}</p>
@@ -248,7 +249,7 @@
                 onclick={() => goto("/")}
                 class="retry-button"
               >
-                <ion-icon name="arrow-back-outline" slot="start"></ion-icon>
+                <ion-icon icon={arrowBackOutline} slot="start"></ion-icon>
                 Try Another Repository
               </ion-button>
               {#if error.includes("rate limit") || error.includes("API")}
@@ -258,7 +259,7 @@
                   onclick={() => initializeAnalysis()}
                   class="retry-button"
                 >
-                  <ion-icon name="refresh-outline" slot="start"></ion-icon>
+                  <ion-icon icon={refreshOutline} slot="start"></ion-icon>
                   Retry Analysis
                 </ion-button>
               {/if}
@@ -286,7 +287,7 @@
           <div class="status-section">
             <ion-item>
               {#if isComplete}
-                <ion-icon name="checkmark-circle" color="success" slot="start"
+                <ion-icon icon={checkmarkCircle} color="success" slot="start"
                 ></ion-icon>
               {:else}
                 <ion-spinner name="crescent" slot="start"></ion-spinner>
@@ -306,12 +307,12 @@
 
               <ion-item>
                 {#if isStepComplete}
-                  <ion-icon name="checkmark-circle" slot="start" color="success"
+                  <ion-icon icon={checkmarkCircle} slot="start" color="success"
                   ></ion-icon>
                 {:else if isCurrentStep}
                   <ion-spinner name="crescent" slot="start"></ion-spinner>
                 {:else}
-                  <ion-icon name="ellipse-outline" slot="start" color="medium"
+                  <ion-icon icon={ellipseOutline} slot="start" color="medium"
                   ></ion-icon>
                 {/if}
                 <ion-label

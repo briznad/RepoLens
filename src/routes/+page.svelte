@@ -8,6 +8,18 @@
   } from "$services/repository";
   import type { FirestoreRepo } from "$types/repository";
   import { parseGitHubUrl } from "$utilities/github-utils";
+  import { 
+    codeSlashOutline, 
+    searchOutline, 
+    timeOutline, 
+    folderOutline, 
+    codeOutline, 
+    starOutline, 
+    analyticsOutline, 
+    documentTextOutline, 
+    gitBranchOutline, 
+    chatbubbleOutline 
+  } from 'ionicons/icons';
 
   let repoUrl = $state("");
   let isLoading = $state(false);
@@ -107,7 +119,7 @@
     <div class="hero-section">
       <div class="hero-content">
         <h1 class="hero-title">
-          <ion-icon name="code-slash-outline" class="hero-icon"></ion-icon>
+          <ion-icon icon={codeSlashOutline} class="hero-icon"></ion-icon>
           RepoLens
         </h1>
         <p class="hero-subtitle">
@@ -165,7 +177,7 @@
               <ion-spinner name="crescent" class="button-spinner"></ion-spinner>
               Processing...
             {:else}
-              <ion-icon name="search-outline" slot="start"></ion-icon>
+              <ion-icon icon={searchOutline} slot="start"></ion-icon>
               Analyze Repository
             {/if}
           </ion-button>
@@ -178,7 +190,7 @@
       <ion-card class="recent-card">
         <ion-card-header>
           <ion-card-title>
-            <ion-icon name="time-outline" class="section-icon"></ion-icon>
+            <ion-icon icon={timeOutline} class="section-icon"></ion-icon>
             Recently Analyzed
           </ion-card-title>
           <ion-card-subtitle
@@ -195,7 +207,7 @@
                 class="recent-item"
               >
                 <ion-avatar slot="start" class="repo-avatar">
-                  <ion-icon name="folder-outline"></ion-icon>
+                  <ion-icon icon={folderOutline}></ion-icon>
                 </ion-avatar>
 
                 <ion-label>
@@ -206,12 +218,12 @@
                   <div class="repo-meta">
                     {#if repo.language}
                       <ion-chip class="language-chip" size="small">
-                        <ion-icon name="code-outline"></ion-icon>
+                        <ion-icon icon={codeOutline}></ion-icon>
                         <ion-label>{repo.language}</ion-label>
                       </ion-chip>
                     {/if}
                     <ion-chip class="stars-chip" size="small">
-                      <ion-icon name="star-outline"></ion-icon>
+                      <ion-icon icon={starOutline}></ion-icon>
                       <ion-label>{repo.stars}</ion-label>
                     </ion-chip>
                     <span class="analyzed-time"
@@ -237,7 +249,7 @@
       <h2 class="features-title">What RepoLens provides</h2>
       <div class="features-grid">
         <div class="feature-item">
-          <ion-icon name="analytics-outline" class="feature-icon"></ion-icon>
+          <ion-icon icon={analyticsOutline} class="feature-icon"></ion-icon>
           <h3>Code Analysis</h3>
           <p>
             Understand public repository structure, dependencies, and code
@@ -245,7 +257,7 @@
           </p>
         </div>
         <div class="feature-item">
-          <ion-icon name="document-text-outline" class="feature-icon"
+          <ion-icon icon={documentTextOutline} class="feature-icon"
           ></ion-icon>
           <h3>Documentation</h3>
           <p>
@@ -254,14 +266,14 @@
           </p>
         </div>
         <div class="feature-item">
-          <ion-icon name="git-branch-outline" class="feature-icon"></ion-icon>
+          <ion-icon icon={gitBranchOutline} class="feature-icon"></ion-icon>
           <h3>Repository Insights</h3>
           <p>
             View file organization, language distribution, and project metrics
           </p>
         </div>
         <div class="feature-item">
-          <ion-icon name="chatbubble-outline" class="feature-icon"></ion-icon>
+          <ion-icon icon={chatbubbleOutline} class="feature-icon"></ion-icon>
           <h3>AI-Powered Chat</h3>
           <p>
             Ask questions about the public codebase and get intelligent

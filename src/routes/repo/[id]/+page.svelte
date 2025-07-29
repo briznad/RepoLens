@@ -6,6 +6,7 @@
   import type { FirestoreRepo } from "$types/repository";
   import type { AnalysisResult } from "$types/analysis";
   import type { ChatMessage } from "$types/chat";
+  import { warningOutline, libraryOutline, refresh, bookOutline, copyOutline, sparklesOutline } from 'ionicons/icons';
 
   const repoId = $derived($page.params.id);
 
@@ -215,7 +216,7 @@ What would you like to explore?`,
       <ion-card class="error-card">
         <ion-card-header>
           <ion-card-title color="danger">
-            <ion-icon name="warning-outline"></ion-icon>
+            <ion-icon icon={warningOutline}></ion-icon>
             Chat Unavailable
           </ion-card-title>
         </ion-card-header>
@@ -226,11 +227,11 @@ What would you like to explore?`,
               fill="outline"
               onclick={() => goto(`/repo/${repoId}/docs`)}
             >
-              <ion-icon name="library-outline" slot="start"></ion-icon>
+              <ion-icon icon={libraryOutline} slot="start"></ion-icon>
               View Documentation
             </ion-button>
             <ion-button fill="solid" onclick={() => window.location.reload()}>
-              <ion-icon name="refresh" slot="start"></ion-icon>
+              <ion-icon icon={refresh} slot="start"></ion-icon>
               Retry
             </ion-button>
           </div>
@@ -246,7 +247,7 @@ What would you like to explore?`,
         <ion-card-content>
           <div class="docs-shortcut">
             <div class="docs-info">
-              <ion-icon name="library-outline" class="docs-icon"></ion-icon>
+              <ion-icon icon={libraryOutline} class="docs-icon"></ion-icon>
               <div>
                 <h4>Repository Documentation</h4>
                 <p>
@@ -258,7 +259,7 @@ What would you like to explore?`,
               fill="outline"
               onclick={() => navigateToDocumentation()}
             >
-              <ion-icon name="book-outline" slot="start"></ion-icon>
+              <ion-icon icon={bookOutline} slot="start"></ion-icon>
               View Docs
             </ion-button>
           </div>
@@ -293,7 +294,7 @@ What would you like to explore?`,
                     onclick={() => copyMessage(message.content)}
                     title="Copy message"
                   >
-                    <ion-icon name="copy-outline" slot="icon-only"></ion-icon>
+                    <ion-icon icon={copyOutline} slot="icon-only"></ion-icon>
                   </ion-button>
                 </div>
               </div>
@@ -311,7 +312,7 @@ What would you like to explore?`,
             <div class="message-bubble streaming">
               <div class="message-header">
                 <div class="message-sender">
-                  <ion-icon name="sparkles-outline"></ion-icon>
+                  <ion-icon icon={sparklesOutline}></ion-icon>
                   <span class="sender-name">Iris</span>
                 </div>
               </div>

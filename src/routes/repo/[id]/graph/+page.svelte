@@ -6,6 +6,7 @@
   import { makeOpenAIRequest } from "$services/ai-analyzer";
   import type { FirestoreRepo } from "$types/repository";
   import type { AnalysisResult, Subsystem, Framework } from "$types/analysis";
+  import { warningOutline, libraryOutline, refresh, download, sparklesOutline, eye, eyeOff } from 'ionicons/icons';
 
   const repoId = $derived($page.params.id);
 
@@ -417,7 +418,7 @@ The architecture follows common ${analysis.framework} patterns with clear separa
       <ion-card class="error-card">
         <ion-card-header>
           <ion-card-title color="danger">
-            <ion-icon name="warning-outline"></ion-icon>
+            <ion-icon icon={warningOutline}></ion-icon>
             Architecture Unavailable
           </ion-card-title>
         </ion-card-header>
@@ -428,11 +429,11 @@ The architecture follows common ${analysis.framework} patterns with clear separa
               fill="outline"
               onclick={() => goto(`/repo/${repoId}/docs`)}
             >
-              <ion-icon name="library-outline" slot="start"></ion-icon>
+              <ion-icon icon={libraryOutline} slot="start"></ion-icon>
               View Documentation
             </ion-button>
             <ion-button fill="solid" onclick={() => window.location.reload()}>
-              <ion-icon name="refresh" slot="start"></ion-icon>
+              <ion-icon icon={refresh} slot="start"></ion-icon>
               Retry
             </ion-button>
           </div>
@@ -471,7 +472,7 @@ The architecture follows common ${analysis.framework} patterns with clear separa
 
           <div class="control-buttons">
             <ion-button size="small" fill="outline" onclick={downloadDiagram}>
-              <ion-icon name="download" slot="start"></ion-icon>
+              <ion-icon icon={download} slot="start"></ion-icon>
               Export PNG
             </ion-button>
             <ion-button
@@ -479,7 +480,7 @@ The architecture follows common ${analysis.framework} patterns with clear separa
               fill="outline"
               onclick={() => (showLegend = !showLegend)}
             >
-              <ion-icon name={showLegend ? "eye-off" : "eye"} slot="start"
+              <ion-icon icon={showLegend ? eyeOff : eye} slot="start"
               ></ion-icon>
               {showLegend ? "Hide" : "Show"} Legend
             </ion-button>
@@ -488,7 +489,7 @@ The architecture follows common ${analysis.framework} patterns with clear separa
               fill="outline"
               onclick={() => switchDiagramType(diagramType)}
             >
-              <ion-icon name="refresh" slot="start"></ion-icon>
+              <ion-icon icon={refresh} slot="start"></ion-icon>
               Refresh
             </ion-button>
           </div>
@@ -512,7 +513,7 @@ The architecture follows common ${analysis.framework} patterns with clear separa
         <ion-card class="description-card">
           <ion-card-header>
             <ion-card-title>
-              <ion-icon name="sparkles-outline"></ion-icon>
+              <ion-icon icon={sparklesOutline}></ion-icon>
               Architecture Analysis
             </ion-card-title>
           </ion-card-header>

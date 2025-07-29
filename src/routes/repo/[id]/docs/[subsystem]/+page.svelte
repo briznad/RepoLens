@@ -13,6 +13,21 @@
     FileInterface,
     CitationLink,
   } from "$types/analysis";
+  import { 
+    arrowBack, 
+    home, 
+    layersOutline, 
+    codeOutline, 
+    logoGithub, 
+    informationCircleOutline, 
+    arrowForwardCircleOutline, 
+    openOutline, 
+    folderOutline, 
+    codeSlashOutline, 
+    codeWorkingOutline, 
+    gitNetworkOutline, 
+    arrowForward 
+  } from 'ionicons/icons';
 
   const repoId = $derived($page.params.id);
   const subsystemName = $derived(
@@ -354,11 +369,11 @@ Focus on architectural concepts and system design.`;
             fill="outline"
             onclick={() => goto(`/repo/${repoId}/docs`)}
           >
-            <ion-icon name="arrow-back" slot="start"></ion-icon>
+            <ion-icon icon={arrowBack} slot="start"></ion-icon>
             Back to Docs
           </ion-button>
           <ion-button fill="outline" onclick={() => goto("/")}>
-            <ion-icon name="home" slot="start"></ion-icon>
+            <ion-icon icon={home} slot="start"></ion-icon>
             Return Home
           </ion-button>
         </div>
@@ -370,7 +385,7 @@ Focus on architectural concepts and system design.`;
       <div class="breadcrumb-nav">
         <ion-breadcrumbs>
           <ion-breadcrumb onclick={() => goto("/")}>
-            <ion-icon name="home"></ion-icon>
+            <ion-icon icon={home}></ion-icon>
             Home
           </ion-breadcrumb>
           <ion-breadcrumb onclick={() => goto(`/repo/${repoId}/docs`)}>
@@ -391,11 +406,11 @@ Focus on architectural concepts and system design.`;
                 <h1 class="subsystem-title">{subsystemName}</h1>
                 <div class="subsystem-meta">
                   <ion-chip color="primary">
-                    <ion-icon name="layers-outline"></ion-icon>
+                    <ion-icon icon={layersOutline}></ion-icon>
                     <ion-label>{subsystem.files.length} files</ion-label>
                   </ion-chip>
                   <ion-chip color="secondary">
-                    <ion-icon name="code-outline"></ion-icon>
+                    <ion-icon icon={codeOutline}></ion-icon>
                     <ion-label>{analysis.framework}</ion-label>
                   </ion-chip>
                   {#if subsystemDescription?.technologies}
@@ -421,7 +436,7 @@ Focus on architectural concepts and system design.`;
                   fill="outline"
                   onclick={() => window.open(repo?.url || "", "_blank")}
                 >
-                  <ion-icon name="logo-github" slot="start"></ion-icon>
+                  <ion-icon icon={logoGithub} slot="start"></ion-icon>
                   View Repository
                 </ion-button>
               </div>
@@ -447,7 +462,7 @@ Focus on architectural concepts and system design.`;
         <ion-card-header>
           <div class="section-header" onclick={() => toggleSection("overview")}>
             <ion-card-title>
-              <ion-icon name="information-circle-outline"></ion-icon>
+              <ion-icon icon={informationCircleOutline}></ion-icon>
               Overview & Architecture Role
             </ion-card-title>
             <ion-icon
@@ -480,7 +495,7 @@ Focus on architectural concepts and system design.`;
                     <div class="entry-points">
                       {#each subsystemDescription.entryPoints as entryPoint}
                         <ion-chip color="success" class="entry-chip">
-                          <ion-icon name="arrow-forward-circle-outline"
+                          <ion-icon icon={arrowForwardCircleOutline}
                           ></ion-icon>
                           <ion-label>{entryPoint}</ion-label>
                           <a
@@ -488,7 +503,7 @@ Focus on architectural concepts and system design.`;
                             target="_blank"
                             rel="noopener"
                           >
-                            <ion-icon name="open-outline"></ion-icon>
+                            <ion-icon icon={openOutline}></ion-icon>
                           </a>
                         </ion-chip>
                       {/each}
@@ -523,7 +538,7 @@ Focus on architectural concepts and system design.`;
         <ion-card-header>
           <div class="section-header" onclick={() => toggleSection("files")}>
             <ion-card-title>
-              <ion-icon name="folder-outline"></ion-icon>
+              <ion-icon icon={folderOutline}></ion-icon>
               Files & Structure ({subsystem.files.length})
             </ion-card-title>
             <ion-icon
@@ -552,7 +567,7 @@ Focus on architectural concepts and system design.`;
                         rel="noopener"
                         class="github-link"
                       >
-                        <ion-icon name="logo-github"></ion-icon>
+                        <ion-icon icon={logoGithub}></ion-icon>
                       </a>
                     </div>
                     <ion-icon
@@ -583,7 +598,7 @@ Focus on architectural concepts and system design.`;
                           onclick={() =>
                             window.open(createGitHubLink(file.path), "_blank")}
                         >
-                          <ion-icon name="open-outline" slot="start"></ion-icon>
+                          <ion-icon icon={openOutline} slot="start"></ion-icon>
                           View on GitHub
                         </ion-button>
                         {#if file.size}
@@ -610,7 +625,7 @@ Focus on architectural concepts and system design.`;
               onclick={() => toggleSection("interfaces")}
             >
               <ion-card-title>
-                <ion-icon name="code-slash-outline"></ion-icon>
+                <ion-icon icon={codeSlashOutline}></ion-icon>
                 Key Functions & Interfaces
               </ion-card-title>
               <ion-icon
@@ -642,7 +657,7 @@ Focus on architectural concepts and system design.`;
                           rel="noopener"
                           class="github-link"
                         >
-                          <ion-icon name="logo-github"></ion-icon>
+                          <ion-icon icon={logoGithub}></ion-icon>
                         </a>
                       </div>
                     </div>
@@ -704,7 +719,7 @@ Focus on architectural concepts and system design.`;
               onclick={() => toggleSection("examples")}
             >
               <ion-card-title>
-                <ion-icon name="code-working-outline"></ion-icon>
+                <ion-icon icon={codeWorkingOutline}></ion-icon>
                 Usage Examples
               </ion-card-title>
               <ion-icon
@@ -753,7 +768,7 @@ Focus on architectural concepts and system design.`;
         <ion-card class="section-card">
           <ion-card-header>
             <ion-card-title>
-              <ion-icon name="git-network-outline"></ion-icon>
+              <ion-icon icon={gitNetworkOutline}></ion-icon>
               Related Subsystems
             </ion-card-title>
           </ion-card-header>
@@ -764,9 +779,9 @@ Focus on architectural concepts and system design.`;
                   class="related-chip"
                   onclick={() => handleRelatedClick(related)}
                 >
-                  <ion-icon name="layers-outline"></ion-icon>
+                  <ion-icon icon={layersOutline}></ion-icon>
                   <ion-label>{related}</ion-label>
-                  <ion-icon name="arrow-forward"></ion-icon>
+                  <ion-icon icon={arrowForward}></ion-icon>
                 </ion-chip>
               {/each}
             </div>

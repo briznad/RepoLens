@@ -6,6 +6,22 @@
   import { getRepoById } from "$lib/services/repository";
   import type { FirestoreRepo, AnalysisStatus } from "$types/repository";
   import type { AnalysisResult, Subsystem } from "$types/analysis";
+  import { 
+    warningOutline, 
+    home, 
+    refresh, 
+    libraryOutline, 
+    logoGithub, 
+    hourglassOutline, 
+    timeOutline, 
+    checkmarkCircleOutline, 
+    arrowForward, 
+    layersOutline, 
+    addOutline, 
+    shareOutline, 
+    syncOutline, 
+    refreshOutline 
+  } from 'ionicons/icons';
 
   interface Props {
     children: Snippet;
@@ -203,7 +219,7 @@
         <ion-card class="error-card">
           <ion-card-header>
             <ion-card-title color="danger">
-              <ion-icon name="warning-outline"></ion-icon>
+              <ion-icon icon={warningOutline}></ion-icon>
               Repository Error
             </ion-card-title>
           </ion-card-header>
@@ -211,11 +227,11 @@
             <p>{error}</p>
             <div class="error-actions">
               <ion-button fill="outline" onclick={() => goto("/")}>
-                <ion-icon name="home" slot="start"></ion-icon>
+                <ion-icon icon={home} slot="start"></ion-icon>
                 Return Home
               </ion-button>
               <ion-button fill="solid" onclick={() => window.location.reload()}>
-                <ion-icon name="refresh" slot="start"></ion-icon>
+                <ion-icon icon={refresh} slot="start"></ion-icon>
                 Retry
               </ion-button>
             </div>
@@ -231,7 +247,7 @@
       <ion-header>
         <ion-toolbar>
           <ion-title>
-            <ion-icon name="library-outline"></ion-icon>
+            <ion-icon icon={libraryOutline}></ion-icon>
             RepoLens
           </ion-title>
         </ion-toolbar>
@@ -248,7 +264,7 @@
                 size="small"
                 onclick={() => window.open(repo.url, "_blank")}
               >
-                <ion-icon name="logo-github" slot="icon-only"></ion-icon>
+                <ion-icon icon={logoGithub} slot="icon-only"></ion-icon>
               </ion-button>
             </div>
             <div class="repo-meta">
@@ -261,17 +277,17 @@
               <div class="analysis-status">
                 {#if repo.analysisStatus === "analyzing"}
                   <ion-chip color="warning" size="small">
-                    <ion-icon name="hourglass-outline"></ion-icon>
+                    <ion-icon icon={hourglassOutline}></ion-icon>
                     <ion-label>Analyzing...</ion-label>
                   </ion-chip>
                 {:else if analysisStale}
                   <ion-chip color="medium" size="small">
-                    <ion-icon name="time-outline"></ion-icon>
+                    <ion-icon icon={timeOutline}></ion-icon>
                     <ion-label>Stale</ion-label>
                   </ion-chip>
                 {:else}
                   <ion-chip color="success" size="small">
-                    <ion-icon name="checkmark-circle-outline"></ion-icon>
+                    <ion-icon icon={checkmarkCircleOutline}></ion-icon>
                     <ion-label>Fresh</ion-label>
                   </ion-chip>
                 {/if}
@@ -324,7 +340,7 @@
                     slot="end"
                   ></ion-icon>
                 {:else}
-                  <ion-icon name="arrow-forward" slot="end" class="nav-arrow"
+                  <ion-icon icon={arrowForward} slot="end" class="nav-arrow"
                   ></ion-icon>
                 {/if}
               </ion-item>
@@ -339,7 +355,7 @@
                       class:selected={isCurrentSubsystem(subsystem.name)}
                       onclick={() => handleSubsystemClick(subsystem.name)}
                     >
-                      <ion-icon name="layers-outline" slot="start"></ion-icon>
+                      <ion-icon icon={layersOutline} slot="start"></ion-icon>
                       <ion-label>
                         <div class="subsystem-name">{subsystem.name}</div>
                         <div class="subsystem-info">
@@ -375,7 +391,7 @@
           </ion-item>
 
           <ion-item button onclick={() => goto("/")}>
-            <ion-icon name="add-outline" slot="start"></ion-icon>
+            <ion-icon icon={addOutline} slot="start"></ion-icon>
             <ion-label>Analyze New Repository</ion-label>
           </ion-item>
 
@@ -383,7 +399,7 @@
             button
             onclick={() => navigator.share?.({ url: window.location.href })}
           >
-            <ion-icon name="share-outline" slot="start"></ion-icon>
+            <ion-icon icon={shareOutline} slot="start"></ion-icon>
             <ion-label>Share Repository</ion-label>
           </ion-item>
         </ion-list>
@@ -404,13 +420,13 @@
               <div class="header-meta">
                 {#if analysisStale}
                   <ion-chip color="warning" size="small">
-                    <ion-icon name="warning-outline"></ion-icon>
+                    <ion-icon icon={warningOutline}></ion-icon>
                     <ion-label>Analysis may be outdated</ion-label>
                   </ion-chip>
                 {/if}
                 {#if repo.analysisStatus === "analyzing"}
                   <ion-chip color="primary" size="small">
-                    <ion-icon name="sync-outline"></ion-icon>
+                    <ion-icon icon={syncOutline}></ion-icon>
                     <ion-label>Analysis in progress</ion-label>
                   </ion-chip>
                 {/if}
@@ -424,7 +440,7 @@
               onclick={() => window.open(repo.url, "_blank")}
               title="View on GitHub"
             >
-              <ion-icon name="logo-github" slot="icon-only"></ion-icon>
+              <ion-icon icon={logoGithub} slot="icon-only"></ion-icon>
             </ion-button>
 
             {#if analysisStale && repo.analysisStatus !== "analyzing"}
@@ -434,7 +450,7 @@
                 onclick={handleRefreshAnalysis}
                 title="Refresh Analysis"
               >
-                <ion-icon name="refresh-outline" slot="icon-only"></ion-icon>
+                <ion-icon icon={refreshOutline} slot="icon-only"></ion-icon>
               </ion-button>
             {/if}
           </ion-buttons>
