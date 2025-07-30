@@ -83,10 +83,6 @@
       isLoading = false;
     }
   };
-
-  const handleRecentRepoClick = (repo: FirestoreRepo) => {
-    goto(`/repo/${repo.id}`);
-  };
 </script>
 
 <ion-content class="ion-padding">
@@ -105,10 +101,7 @@
 
     <!-- Recent Repositories Section -->
     {#if !loadingRecent}
-      <RecentRepositoriesList
-        repositories={recentRepos}
-        onRepoClick={handleRecentRepoClick}
-      />
+      <RecentRepositoriesList repositories={recentRepos} />
     {/if}
 
     <!-- Features Section -->

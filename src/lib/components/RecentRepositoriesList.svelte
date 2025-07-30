@@ -1,24 +1,24 @@
 <script lang="ts">
-  import type { FirestoreRepo } from '$types/repository';
-  import { timeOutline, folderOutline, codeOutline, starOutline, chevronForwardOutline } from 'ionicons/icons';
+  import type { FirestoreRepo } from "$types/repository";
+  import {
+    timeOutline,
+    folderOutline,
+    codeOutline,
+    starOutline,
+    chevronForwardOutline,
+  } from "ionicons/icons";
 
   interface Props {
     title?: string;
     subtitle?: string;
     repositories: FirestoreRepo[];
-    onRepoClick: (repo: FirestoreRepo) => void;
   }
 
-  let { 
+  let {
     title = "Recently Analyzed",
     subtitle = "Jump back into repositories you've already explored",
     repositories,
-    onRepoClick
   }: Props = $props();
-
-  function handleRepoClick(repo: FirestoreRepo) {
-    onRepoClick(repo);
-  }
 
   function formatTimeAgo(date: Date): string {
     const now = new Date();
@@ -52,40 +52,15 @@
         {#each repositories as repo}
           <ion-item
             button
-            onclick={() => handleRepoClick(repo)}
             class="recent-item"
+            href="/repo/{repo.id}"
+            lines="none"
           >
-            <ion-avatar slot="start" class="repo-avatar">
-              <ion-icon icon={folderOutline}></ion-icon>
-            </ion-avatar>
+            <h3 slot="start" class="repo-name">{repo.fullName}</h3>
 
-            <ion-label>
-              <h3 class="repo-name">{repo.fullName}</h3>
-              <p class="repo-description">
-                {repo.description || "No description available"}
-              </p>
-              <div class="repo-meta">
-                {#if repo.language}
-                  <ion-chip class="language-chip" size="small">
-                    <ion-icon icon={codeOutline}></ion-icon>
-                    <ion-label>{repo.language}</ion-label>
-                  </ion-chip>
-                {/if}
-                <ion-chip class="stars-chip" size="small">
-                  <ion-icon icon={starOutline}></ion-icon>
-                  <ion-label>{repo.stars}</ion-label>
-                </ion-chip>
-                <span class="analyzed-time">
-                  {formatTimeAgo(new Date(repo.lastAnalyzed))}
-                </span>
-              </div>
-            </ion-label>
-
-            <ion-icon
-              icon={chevronForwardOutline}
-              slot="end"
-              class="chevron-icon"
-            ></ion-icon>
+            <span slot="end" class="analyzed-time">
+              {formatTimeAgo(new Date(repo.lastAnalyzed))}
+            </span>
           </ion-item>
         {/each}
       </ion-list>
