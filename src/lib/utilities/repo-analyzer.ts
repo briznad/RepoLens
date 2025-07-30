@@ -15,6 +15,24 @@ import type {
 export function detectFramework(repoData: RepoData, files: GitHubFile[]): Framework {
   const filePaths = files.map(f => f.path.toLowerCase());
 
+  // Check for Multi-framework projects first (before React detection)
+  if (filePaths.some(path => path.startsWith('examples/')) &&
+      filePaths.some(path => path.includes('package.json')) &&
+      filePaths.some(path => path.includes('readme.md') || path.includes('README.md'))) {
+    // Look for multiple framework indicators in examples directory
+    const examplePaths = filePaths.filter(path => path.startsWith('examples/'));
+    const frameworkIndicators = [
+      'angular', 'react', 'vue', 'ember', 'backbone', 'knockout', 
+      'polymer', 'svelte', 'mithril', 'riot', 'aurelia'
+    ];
+    const foundFrameworks = frameworkIndicators.filter(framework =>
+      examplePaths.some(path => path.includes(framework))
+    );
+    if (foundFrameworks.length >= 2) {
+      return 'multi-framework';
+    }
+  }
+
   // Check for Next.js first (more specific than React)
   if (filePaths.some(path => path.includes('next.config.js') || path.includes('next.config.ts') ||
                             path.includes('next.config.mjs') || path.includes('next.config.cjs'))) {
@@ -72,6 +90,43 @@ export function detectFramework(repoData: RepoData, files: GitHubFile[]): Framew
   if (filePaths.some(path => path.includes('main.py')) &&
       filePaths.some(path => path.includes('requirements.txt') || path.includes('pyproject.toml'))) {
     return 'fastapi';
+  }
+
+
+  // Check for Python CLI tools
+  if (filePaths.some(path => path.includes('pyproject.toml')) &&
+      filePaths.some(path => path.endsWith('.py'))) {
+    
+    // Look for CLI-specific patterns
+    const hasCliPatterns = filePaths.some(path => 
+      path.includes('cli') || path.includes('command') || path.includes('main.py') ||
+      path.includes('__main__.py') || path.includes('console_scripts') || path.includes('bin/')
+    );
+    
+    // Look for Poetry or modern Python packaging
+    const hasModernPython = filePaths.some(path => 
+      path.includes('poetry.lock') || path.includes('setup.py') || 
+      path.includes('setup.cfg') || path.includes('pyproject.toml')
+    );
+
+    // Check if it's more of a library structure
+    const hasLibStructure = filePaths.some(path => path.startsWith('src/')) &&
+                           filePaths.some(path => path.includes('tests/')) &&
+                           !filePaths.some(path => path.includes('app.py') || path.includes('main.py'));
+
+    if (hasCliPatterns && hasModernPython) {
+      return 'python-cli';
+    } else if (hasLibStructure && hasModernPython) {
+      return 'python-lib';
+    }
+  }
+
+  // General Python library/package detection
+  if (filePaths.some(path => path.includes('setup.py') || path.includes('pyproject.toml')) &&
+      filePaths.some(path => path.endsWith('.py')) &&
+      !filePaths.some(path => path.includes('app.py') || path.includes('main.py') || path.includes('wsgi.py'))) {
+    // This looks like a Python library rather than a web framework
+    return 'python-lib';
   }
 
   return 'unknown';
@@ -361,6 +416,145 @@ const FRAMEWORK_PATTERNS: Record<Framework, SubsystemPattern[]> = {
       description: 'Project documentation and guides',
       patterns: ['docs/', 'documentation/', 'README', 'CHANGELOG', 'CONTRIBUTING'],
       extensions: ['.md', '.rst', '.txt'],
+      priority: 7
+    }
+  ],
+  'python-cli': [
+    {
+      name: 'CLI/Commands',
+      description: 'Command-line interface and command implementations',
+      patterns: ['src/', 'cli/', 'commands/', 'bin/'],
+      extensions: ['.py'],
+      priority: 1
+    },
+    {
+      name: 'Core/Library',
+      description: 'Core library functionality and modules',
+      patterns: ['src/', 'lib/', 'core/'],
+      extensions: ['.py'],
+      priority: 2
+    },
+    {
+      name: 'Configuration',
+      description: 'Configuration files and project setup',
+      patterns: ['config/', 'settings/', '.'],
+      extensions: ['.toml', '.cfg', '.ini', '.yaml', '.yml', '.json'],
+      priority: 3
+    },
+    {
+      name: 'Tests',
+      description: 'Test files and test utilities',
+      patterns: ['tests/', 'test/', 'test_data/'],
+      extensions: ['.py'],
+      priority: 4
+    },
+    {
+      name: 'Documentation',
+      description: 'Project documentation and guides',
+      patterns: ['docs/', 'documentation/', 'README', 'CHANGELOG', 'CONTRIBUTING'],
+      extensions: ['.md', '.rst', '.txt'],
+      priority: 5
+    },
+    {
+      name: 'Assets/Resources',
+      description: 'Static assets and resource files',
+      patterns: ['assets/', 'resources/', 'static/', 'imgs/', 'media/'],
+      extensions: ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.css', '.js', '.html'],
+      priority: 6
+    }
+  ],
+  'python-lib': [
+    {
+      name: 'Source/Library',
+      description: 'Main library source code and modules',
+      patterns: ['src/', 'lib/', 'package_name/'],
+      extensions: ['.py'],
+      priority: 1
+    },
+    {
+      name: 'API/Interface',
+      description: 'Public API and interface definitions',
+      patterns: ['src/', 'api/', 'interface/'],
+      extensions: ['.py'],
+      priority: 2
+    },
+    {
+      name: 'Tests',
+      description: 'Test files and test utilities',
+      patterns: ['tests/', 'test/', 'test_data/'],
+      extensions: ['.py'],
+      priority: 3
+    },
+    {
+      name: 'Examples',
+      description: 'Usage examples and sample code',
+      patterns: ['examples/', 'samples/', 'demo/'],
+      extensions: ['.py', '.ipynb', '.md'],
+      priority: 4
+    },
+    {
+      name: 'Configuration',
+      description: 'Configuration files and project setup',
+      patterns: ['config/', 'settings/', '.'],
+      extensions: ['.toml', '.cfg', '.ini', '.yaml', '.yml', '.json', '.py'],
+      priority: 5
+    },
+    {
+      name: 'Documentation',
+      description: 'Project documentation and guides',
+      patterns: ['docs/', 'documentation/', 'README', 'CHANGELOG', 'CONTRIBUTING'],
+      extensions: ['.md', '.rst', '.txt'],
+      priority: 6
+    }
+  ],
+  'multi-framework': [
+    {
+      name: 'Examples/Implementations',
+      description: 'Framework-specific implementations and examples',
+      patterns: ['examples/', 'implementations/', 'samples/'],
+      extensions: ['.js', '.jsx', '.ts', '.tsx', '.vue', '.svelte', '.html', '.css'],
+      priority: 1
+    },
+    {
+      name: 'Shared/Common',
+      description: 'Shared resources and common files',
+      patterns: ['shared/', 'common/', 'assets/', 'css/', 'js/'],
+      extensions: ['.js', '.css', '.html', '.json', '.md'],
+      priority: 2
+    },
+    {
+      name: 'Testing',
+      description: 'Testing infrastructure and test files',
+      patterns: ['tests/', 'test/', 'cypress/', 'e2e/'],
+      extensions: ['.js', '.ts', '.json', '.config.js'],
+      priority: 3
+    },
+    {
+      name: 'Tooling/Build',
+      description: 'Build tools and development utilities',
+      patterns: ['tools/', 'tooling/', 'build/', 'tasks/', 'scripts/'],
+      extensions: ['.js', '.json', '.yml', '.yaml'],
+      priority: 4
+    },
+    {
+      name: 'Site/Assets',
+      description: 'Website assets and static resources',
+      patterns: ['site-assets/', 'static/', 'public/', 'media/'],
+      extensions: ['.css', '.js', '.html', '.png', '.jpg', '.svg', '.ico'],
+      priority: 5
+    },
+    {
+      name: 'Documentation',
+      description: 'Project documentation and guides',
+      patterns: ['docs/', 'documentation/', 'README', 'CHANGELOG', 'CONTRIBUTING'],
+      extensions: ['.md', '.html', '.txt'],
+      priority: 6
+    },
+    {
+      name: 'Configuration',
+      description: 'Configuration files and project setup',
+      patterns: ['config/', '.'],
+      extensions: ['.json', '.js', '.yml', '.yaml', '.toml', '.config.js'],
       priority: 7
     }
   ],
