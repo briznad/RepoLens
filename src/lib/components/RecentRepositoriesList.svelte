@@ -89,52 +89,16 @@
     --padding-end: 16px;
   }
 
-  .repo-avatar {
-    --background: var(--ion-color-primary-tint);
-    --color: var(--ion-color-primary);
-    width: 40px;
-    height: 40px;
-  }
-
   .repo-name {
     font-weight: 600;
     color: var(--ion-color-dark);
     margin-bottom: 4px;
   }
 
-  .repo-description {
-    font-size: 0.9rem;
-    color: var(--ion-color-medium);
-    margin-bottom: 8px;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-
-  .repo-meta {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-wrap: wrap;
-  }
-
-  .language-chip,
-  .stars-chip {
-    --background: var(--ion-color-primary-tint);
-    --color: var(--ion-color-primary);
-    height: 24px;
-    font-size: 0.8rem;
-  }
-
   .analyzed-time {
     font-size: 0.8rem;
     color: var(--ion-color-medium);
     margin-left: auto;
-  }
-
-  .chevron-icon {
-    color: var(--ion-color-medium);
   }
 
   // Responsive Design
