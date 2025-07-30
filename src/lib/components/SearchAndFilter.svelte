@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { star } from "ionicons/icons";
+
   interface FilterOption {
     value: string;
     label: string;
@@ -13,13 +15,13 @@
     onSortChange?: (sortBy: string) => void;
   }
 
-  let { 
-    searchQuery, 
-    searchPlaceholder = 'Search...', 
+  let {
+    searchQuery,
+    searchPlaceholder = "Search...",
     sortBy,
     sortOptions = [],
     onSearchChange,
-    onSortChange
+    onSortChange,
   }: Props = $props();
 
   function handleSearchInput(e: any) {
@@ -33,54 +35,45 @@
   }
 </script>
 
-<ion-card class="filter-card">
+<ion-card>
   <ion-card-content>
-    <div class="filter-section">
-      <ion-searchbar
-        placeholder={searchPlaceholder}
-        value={searchQuery}
-        onionInput={handleSearchInput}
-        show-clear-button="focus"
-      ></ion-searchbar>
-      
-      {#if sortOptions.length > 0 && onSortChange}
-        <div class="filter-controls">
-          <ion-select
-            placeholder="Sort by"
-            value={sortBy}
-            onionSelectionChange={handleSortChange}
-          >
-            {#each sortOptions as option}
-              <ion-select-option value={option.value}>
-                {option.label}
-              </ion-select-option>
-            {/each}
-          </ion-select>
-        </div>
-      {/if}
-    </div>
+    <ion-searchbar
+      slot="start"
+      placeholder={searchPlaceholder}
+      value={searchQuery}
+      onionInput={handleSearchInput}
+      show-clear-button="focus"
+    ></ion-searchbar>
+
+    {#if sortOptions.length > 0 && onSortChange}
+      <ion-select
+        slot="end"
+        placeholder="Sort by"
+        value={sortBy}
+        onionSelectionChange={handleSortChange}
+      >
+        {#each sortOptions as option}
+          <ion-select-option value={option.value}>
+            {option.label}
+          </ion-select-option>
+        {/each}
+      </ion-select>
+    {/if}
   </ion-card-content>
 </ion-card>
 
 <style lang="scss">
-  .filter-card {
-    margin-bottom: 24px;
+  ion-card {
+    margin-bottom: 0;
   }
 
-  .filter-section {
+  ion-card-content {
     display: flex;
-    gap: 16px;
     align-items: center;
-    
-    @media (max-width: 768px) {
-      flex-direction: column;
-      align-items: stretch;
-    }
+    justify-content: space-between;
   }
 
-  .filter-controls {
-    display: flex;
-    gap: 12px;
-    min-width: 200px;
+  ion-searchbar {
+    padding-left: 0;
   }
 </style>
