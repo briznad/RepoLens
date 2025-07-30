@@ -124,6 +124,15 @@
       <LanguageDistribution languages={analysis.languages} />
     {/if}
 
+    <SectionHeader
+      title="Subsystems & Components"
+      icon={layersOutline}
+      subtitle="{filteredSubsystems.length} subsystem{filteredSubsystems.length !==
+      1
+        ? 's'
+        : ''} found"
+    />
+
     <!-- Search and Filter Section -->
     <SearchAndFilter
       {searchQuery}
@@ -136,15 +145,6 @@
       ]}
       onSearchChange={(query) => (searchQuery = query)}
       onSortChange={(sort) => (sortBy = sort)}
-    />
-
-    <SectionHeader
-      title="Subsystems & Components"
-      icon={layersOutline}
-      subtitle="{filteredSubsystems.length} subsystem{filteredSubsystems.length !==
-      1
-        ? 's'
-        : ''} found"
     />
 
     <!-- Subsystems Grid -->
