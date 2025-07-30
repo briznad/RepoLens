@@ -14,6 +14,7 @@ import {
 } from '$types/error';
 
 import { analyzeRepo } from '$utilities/repo-analyzer';
+import { analyzeRepoWithAI } from '$services/ai-analyzer';
 
 const GITHUB_API_BASE = 'https://api.github.com';
 
@@ -159,8 +160,8 @@ export class GitHubAPI {
       );
       const fileTree = treeResponse.data;
 
-      // Use the analyzer to process the repository
-      const analysisResult = analyzeRepo(repoData, fileTree.tree);
+      // Use the AI-enhanced analyzer to process the repository
+      const analysisResult = await analyzeRepoWithAI(repoData, fileTree.tree);
 
       // Update the file tree SHA in the version
       analysisResult.version.fileTreeSha = fileTree.sha;
