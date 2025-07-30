@@ -1,12 +1,6 @@
 <script lang="ts">
   import type { FirestoreRepo } from "$types/repository";
-  import {
-    timeOutline,
-    folderOutline,
-    codeOutline,
-    starOutline,
-    chevronForwardOutline,
-  } from "ionicons/icons";
+  import { timeOutline } from "ionicons/icons";
 
   interface Props {
     title?: string;
@@ -16,7 +10,7 @@
 
   let {
     title = "Recently Analyzed",
-    subtitle = "Jump back into repositories you've already explored",
+    subtitle = "View recently analyzed repositories",
     repositories,
   }: Props = $props();
 
