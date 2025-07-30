@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { download, eye, eyeOff, refresh } from 'ionicons/icons';
+  import { download, eye, eyeOff } from "ionicons/icons";
 
   interface View {
     value: string;
@@ -7,34 +7,27 @@
   }
 
   interface Props {
-    title?: string;
-    subtitle: string;
     views: View[];
     selectedView: string;
     showLegend: boolean;
     onViewChange: (event: any) => void;
     onDownload: () => void;
     onToggleLegend: () => void;
-    onRefresh: () => void;
   }
 
-  let { 
-    title = "Repository Architecture",
-    subtitle,
+  let {
     views,
     selectedView,
     showLegend,
     onViewChange,
     onDownload,
     onToggleLegend,
-    onRefresh
   }: Props = $props();
 </script>
 
-<ion-card class="controls-card">
+<ion-card>
   <ion-card-header>
-    <ion-card-title>{title}</ion-card-title>
-    <ion-card-subtitle>{subtitle}</ion-card-subtitle>
+    <ion-card-title>Select View</ion-card-title>
   </ion-card-header>
 
   <ion-card-content>
@@ -62,17 +55,14 @@
         <ion-icon icon={showLegend ? eyeOff : eye} slot="start"></ion-icon>
         {showLegend ? "Hide" : "Show"} Legend
       </ion-button>
-      <ion-button size="small" fill="outline" onclick={onRefresh}>
-        <ion-icon icon={refresh} slot="start"></ion-icon>
-        Refresh
-      </ion-button>
     </div>
   </ion-card-content>
 </ion-card>
 
 <style lang="scss">
-  .controls-card {
-    margin-bottom: 20px;
+  ion-item {
+    --padding-start: 0;
+    --padding-end: 0;
   }
 
   .control-buttons {

@@ -3,7 +3,7 @@
     message?: string;
   }
 
-  let { message = "Loading repository architecture..." }: Props = $props();
+  let { message = "Loading repository architecture" }: Props = $props();
 </script>
 
 <ion-content class="ion-padding">
