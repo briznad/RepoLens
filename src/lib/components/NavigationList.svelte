@@ -105,7 +105,4 @@
     margin-left: 16px;
   }
 
-  .subitems-menu {
-    margin-left: 16px;
-  }
 </style>
