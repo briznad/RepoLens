@@ -2,6 +2,7 @@ import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 import type { FirestoreRepo } from '$types/repository';
 import type { AnalysisResult } from '$types/analysis';
+import { OPENAI_API_KEY } from '$env/static/private';
 
 function createSystemPrompt(repositoryData: FirestoreRepo, analysisData: AnalysisResult, repoId: string): string {
   const repoName = repositoryData?.fullName || repositoryData?.name || 'Unknown Repository';
@@ -64,17 +65,28 @@ ${mainFilesSummary}
 
 ### Response Format:
 - Use markdown for formatting
-- Include links to documentation pages using the format: \`[Subsystem Name](/repo/${repoId}/docs/SubsystemName)\`
+- **IMPORTANT**: When mentioning any subsystem by name, ALWAYS format it as a clickable link
+- Subsystem links format: \`[Subsystem Name](/repo/${repoId}/docs/SubsystemName)\`
+- For example: "These files are part of the [Components](/repo/${repoId}/docs/Components) subsystem"
 - Reference GitHub files using: \`[filename](${repositoryData?.url || ''}/blob/main/path/to/file)\`
 - Keep responses concise and actionable (under 300 words typically)
 - Use a professional but friendly tone
+
+### Available Subsystems for Linking:
+${subsystems.map(s => `- [${s.name}](/repo/${repoId}/docs/${encodeURIComponent(s.name)})`).join('\n')}
 
 ### File References:
 When referencing files, always provide GitHub links in this format:
 \`[filename](${repositoryData?.url || ''}/blob/main/path/to/file)\`
 
-### Example Response Pattern:
-"Based on your question about [topic], I'd recommend checking out the [Subsystem Name](/repo/${repoId}/docs/SubsystemName) documentation page. The main logic is implemented in [key-file.js](${repositoryData?.url || ''}/blob/main/src/key-file.js)."
+### Example Response Patterns:
+1. "The authentication logic is handled in the [Services](/repo/${repoId}/docs/Services) subsystem, specifically in [auth.service.ts](${repositoryData?.url || ''}/blob/main/src/services/auth.service.ts)."
+
+2. "These components are part of the [Components](/repo/${repoId}/docs/Components) subsystem. You can find the main button component in [Button.tsx](${repositoryData?.url || ''}/blob/main/src/components/Button.tsx)."
+
+3. "The [Routes](/repo/${repoId}/docs/Routes) subsystem handles all the API endpoints, while the [Models](/repo/${repoId}/docs/Models) subsystem defines the data structures."
+
+Always use this linking format when mentioning subsystems!
 
 ### What You Should NOT Do:
 - Don't write code unless specifically asked
@@ -97,10 +109,9 @@ export const POST: RequestHandler = async ({ request }) => {
     }
 
     // Get API key from environment
-    const anthropicApiKey = process.env.ANTHROPIC_API_KEY;
-    if (!anthropicApiKey) {
+    if (!OPENAI_API_KEY) {
       return json(
-        { error: 'Anthropic API key not configured' },
+        { error: 'OpenAI API key not configured' },
         { status: 500 }
       );
     }
@@ -108,31 +119,33 @@ export const POST: RequestHandler = async ({ request }) => {
     // Create documentation-focused system prompt
     const systemPrompt = createSystemPrompt(repositoryData, analysisData, repoId);
 
-    // Call Anthropic API
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    // Call OpenAI API
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': anthropicApiKey,
-        'anthropic-version': '2023-06-01',
+        'Authorization': `Bearer ${OPENAI_API_KEY}`,
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 1000,
-        temperature: 0.3,
-        system: systemPrompt,
+        model: 'gpt-4o-mini',
         messages: [
+          {
+            role: 'system',
+            content: systemPrompt
+          },
           {
             role: 'user',
             content: message
           }
-        ]
+        ],
+        max_tokens: 1000,
+        temperature: 0.3
       })
     });
 
     if (!response.ok) {
       const error = await response.text();
-      console.error('Anthropic API error:', error);
+      console.error('OpenAI API error:', error);
       return json(
         { error: 'Failed to generate response from AI service' },
         { status: 500 }
@@ -140,14 +153,14 @@ export const POST: RequestHandler = async ({ request }) => {
     }
 
     const data = await response.json();
-    const assistantMessage = data.content?.[0]?.text || 'I apologize, but I could not generate a response.';
+    const assistantMessage = data.choices?.[0]?.message?.content || 'I apologize, but I could not generate a response.';
 
     return json({
       success: true,
       message: assistantMessage,
       usage: {
-        inputTokens: data.usage?.input_tokens || 0,
-        outputTokens: data.usage?.output_tokens || 0
+        inputTokens: data.usage?.prompt_tokens || 0,
+        outputTokens: data.usage?.completion_tokens || 0
       }
     });
 
