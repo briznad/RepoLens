@@ -17,11 +17,10 @@
   interface Props {
     repo: FirestoreRepo;
     analysis: AnalysisResult;
-    analysisStale: boolean;
     formatTimestamp: (timestamp: string) => string;
   }
 
-  let { repo, analysis, analysisStale, formatTimestamp }: Props = $props();
+  let { repo, analysis, formatTimestamp }: Props = $props();
 
   // Calculate analysis age for display
   const analysisAge = $derived(() => {
@@ -116,11 +115,6 @@
     <ion-chip color="primary" size="small">
       <ion-icon icon={syncOutline}></ion-icon>
       <ion-label>Analysis in progress</ion-label>
-    </ion-chip>
-  {:else if analysisStale}
-    <ion-chip color="warning" size="small">
-      <ion-icon icon={warningOutline}></ion-icon>
-      <ion-label>Analysis may be outdated</ion-label>
     </ion-chip>
   {/if}
 </header>
