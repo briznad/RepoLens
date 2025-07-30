@@ -54,12 +54,6 @@
 <style lang="scss">
   .language-section {
     margin-top: 24px;
-
-    h3 {
-      font-size: 1.2rem;
-      margin-bottom: 16px;
-      color: var(--ion-color-dark);
-    }
   }
 
   .language-bars {
