@@ -91,9 +91,14 @@
           {/if}
         </div>
       {:else}
-        <p class="fallback-content">
-          Basic subsystem information is being processed...
-        </p>
+        <div class="loading-content">
+          <p class="fallback-content">
+            Analyzing subsystem structure and dependencies...
+          </p>
+          <ion-skeleton-text animated style="width: 100%; margin-top: 16px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="width: 90%; margin-top: 8px;"></ion-skeleton-text>
+          <ion-skeleton-text animated style="width: 70%; margin-top: 8px;"></ion-skeleton-text>
+        </div>
       {/if}
     </ion-card-content>
   {/if}
@@ -172,8 +177,5 @@
   .fallback-content {
     color: var(--ion-color-medium);
     font-style: italic;
-    text-align: center;
-    padding: 20px 0;
-    margin: 0;
   }
 </style>
