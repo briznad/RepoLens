@@ -88,6 +88,7 @@
   ion-menu {
     --width: 280px;
 
+    max-width: 375px;
     view-transition-name: menu;
 
     @media (max-width: 768px) {
@@ -100,5 +101,4 @@
       view-transition-name: layout-header;
     }
   }
-
 </style>
