@@ -1,6 +1,10 @@
 <script lang="ts">
-  import { copyOutline, sparklesOutline } from 'ionicons/icons';
-  import type { ChatMessage as ChatMessageType } from '$types/chat';
+  import {
+    copyOutline,
+    sparklesOutline,
+    personCircleOutline,
+  } from "ionicons/icons";
+  import type { ChatMessage as ChatMessageType } from "$types/chat";
 
   interface Props {
     message: ChatMessageType;
@@ -20,7 +24,15 @@
     return content
       .replace(
         /\[([^\]]+)\]\(([^)]+)\)/g,
-        '<a href="$2" target="_blank" rel="noopener">$1</a>'
+        (match, text, url) => {
+          // Check if it's an internal link (starts with /repo/)
+          if (url.startsWith('/repo/')) {
+            return `<a href="${url}">${text}</a>`;
+          } else {
+            // External link
+            return `<a href="${url}" target="_blank" rel="noopener">${text}</a>`;
+          }
+        }
       )
       .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
       .replace(/\*(.*?)\*/g, "<em>$1</em>")
@@ -38,8 +50,7 @@
     <div class="message-header">
       <div class="message-sender">
         <ion-icon
-          icon={message.role === "user" ? null : sparklesOutline}
-          name={message.role === "user" ? "person-circle-outline" : null}
+          icon={message.role === "user" ? personCircleOutline : sparklesOutline}
         ></ion-icon>
         <span class="sender-name"
           >{message.role === "user" ? "You" : "Iris"}</span
@@ -57,10 +68,9 @@
         </ion-button>
       </div>
     </div>
-    <div
-      class="message-content"
-      innerHTML={processMessageContent(message.content)}
-    ></div>
+    <div class="message-content">
+      {@html processMessageContent(message.content)}
+    </div>
   </div>
 </div>
 
@@ -149,6 +159,7 @@
   .timestamp {
     font-size: 0.75rem;
     color: var(--ion-color-medium);
+    padding-left: 0.75em;
   }
 
   .message-content {

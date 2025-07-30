@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { hourglassOutline, send } from "ionicons/icons";
+
   interface Props {
     currentMessage: string;
     isStreaming: boolean;
@@ -8,13 +10,13 @@
     onKeyPress: (event: KeyboardEvent) => void;
   }
 
-  let { 
+  let {
     currentMessage,
     isStreaming,
     placeholder = "Ask Iris about the repository...",
     onMessageChange,
     onSendMessage,
-    onKeyPress
+    onKeyPress,
   }: Props = $props();
 
   let messageInput: HTMLIonTextareaElement;
@@ -46,7 +48,7 @@
           class="send-button"
         >
           <ion-icon
-            name={isStreaming ? "hourglass-outline" : "send"}
+            icon={isStreaming ? hourglassOutline : send}
             slot="icon-only"
           ></ion-icon>
         </ion-button>

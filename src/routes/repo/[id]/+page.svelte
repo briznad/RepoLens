@@ -3,15 +3,15 @@
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import { getRepoById } from "$lib/services/repository";
+  import { chatService } from "$lib/services/chat";
   import type { FirestoreRepo } from "$types/repository";
   import type { AnalysisResult } from "$types/analysis";
   import type { ChatMessage } from "$types/chat";
-  import ChatLoadingState from '$components/chat/LoadingState.svelte';
-  import ChatErrorCard from '$components/chat/ErrorCard.svelte';
-  import DocsShortcutCard from '$components/DocsShortcutCard.svelte';
-  import ChatMessage from '$components/chat/Message.svelte';
-  import ChatTypingIndicator from '$components/chat/TypingIndicator.svelte';
-  import ChatInput from '$components/chat/Input.svelte';
+  import ChatLoadingState from "$components/chat/LoadingState.svelte";
+  import ChatErrorCard from "$components/chat/ErrorCard.svelte";
+  import ChatMessageComponent from "$components/chat/Message.svelte";
+  import ChatTypingIndicator from "$components/chat/TypingIndicator.svelte";
+  import ChatInput from "$components/chat/Input.svelte";
 
   const repoId = $derived($page.params.id);
 
@@ -26,6 +26,8 @@
   let currentMessage = $state("");
   let isStreaming = $state(false);
   let messagesContainer: HTMLElement;
+  let sessionId = $state<string | null>(null);
+  let isLoadingMessages = $state(false);
 
   // Load repository data and initialize chat
   onMount(async () => {
@@ -52,8 +54,8 @@
         return;
       }
 
-      // Initialize with welcome message
-      initializeChat();
+      // Initialize chat session and load history
+      await initializeChat();
     } catch (err) {
       error = err instanceof Error ? err.message : "Failed to load repository";
     } finally {
@@ -69,16 +71,30 @@
   });
 
   // Initialize chat with contextual welcome message
-  function initializeChat() {
-    if (!repo || !analysis) return;
+  async function initializeChat() {
+    if (!repo || !analysis || !repoId) return;
 
-    const framework = analysis.framework;
-    const subsystemCount = analysis.subsystems.length;
-    const repoName = repo.name;
+    try {
+      isLoadingMessages = true;
 
-    const welcomeMessage: ChatMessage = {
-      id: "1",
-      content: `Hi! I'm Iris 👋 I've analyzed the **${repoName}** ${framework} repository and created documentation for **${subsystemCount} subsystems**. I can help you navigate the docs and understand the codebase.
+      // Get or create chat session
+      sessionId = await chatService.getOrCreateSession(repoId);
+
+      // Load existing messages
+      const existingMessages = await chatService.loadMessages(sessionId);
+
+      if (existingMessages.length > 0) {
+        // Use existing chat history
+        messages = existingMessages;
+      } else {
+        // Create welcome message for new session
+        const framework = analysis.framework;
+        const subsystemCount = analysis.subsystems.length;
+        const repoName = repo.name;
+
+        const welcomeMessage: ChatMessage = {
+          id: `welcome_${Date.now()}`,
+          content: `Hi! I'm Iris 👋 I've analyzed the **${repoName}** ${framework} repository and created documentation for **${subsystemCount} subsystems**. I can help you navigate the docs and understand the codebase.
 
 **What I can help with:**
 • Navigate to specific [documentation pages](/repo/${repoId}/docs)
@@ -87,16 +103,53 @@
 • Understand architectural patterns
 
 What would you like to explore?`,
-      role: "assistant",
-      timestamp: new Date().toISOString(),
-    };
+          role: "assistant",
+          timestamp: new Date().toISOString(),
+        };
 
-    messages = [welcomeMessage];
+        messages = [welcomeMessage];
+
+        // Save welcome message to session
+        await chatService.saveMessage(sessionId, welcomeMessage);
+      }
+    } catch (err) {
+      console.error("Failed to initialize chat:", err);
+      // Fallback to in-memory chat
+      const framework = analysis.framework;
+      const subsystemCount = analysis.subsystems.length;
+      const repoName = repo.name;
+
+      const welcomeMessage: ChatMessage = {
+        id: `welcome_${Date.now()}`,
+        content: `Hi! I'm Iris 👋 I've analyzed the **${repoName}** ${framework} repository and created documentation for **${subsystemCount} subsystems**. I can help you navigate the docs and understand the codebase.
+
+**What I can help with:**
+• Navigate to specific [documentation pages](/repo/${repoId}/docs)
+• Explain subsystems and their relationships
+• Find specific files and functions
+• Understand architectural patterns
+
+What would you like to explore?`,
+        role: "assistant",
+        timestamp: new Date().toISOString(),
+      };
+
+      messages = [welcomeMessage];
+    } finally {
+      isLoadingMessages = false;
+    }
   }
 
   // Send message to chat API
   async function sendMessage() {
-    if (!currentMessage.trim() || isStreaming || !repo || !analysis) return;
+    if (
+      !currentMessage.trim() ||
+      isStreaming ||
+      !repo ||
+      !analysis ||
+      !sessionId
+    )
+      return;
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
@@ -109,6 +162,13 @@ What would you like to explore?`,
     const messageText = currentMessage;
     currentMessage = "";
     isStreaming = true;
+
+    // Save user message to session
+    try {
+      await chatService.saveMessage(sessionId, userMessage);
+    } catch (err) {
+      console.error("Failed to save user message:", err);
+    }
 
     try {
       const response = await fetch("/api/chat", {
@@ -139,6 +199,13 @@ What would you like to explore?`,
         };
 
         messages = [...messages, assistantMessage];
+
+        // Save assistant message to session
+        try {
+          await chatService.saveMessage(sessionId, assistantMessage);
+        } catch (err) {
+          console.error("Failed to save assistant message:", err);
+        }
       } else {
         throw new Error(data.error || "Failed to get response");
       }
@@ -152,6 +219,15 @@ What would you like to explore?`,
         timestamp: new Date().toISOString(),
       };
       messages = [...messages, errorMessage];
+
+      // Save error message to session
+      try {
+        if (sessionId) {
+          await chatService.saveMessage(sessionId, errorMessage);
+        }
+      } catch (saveErr) {
+        console.error("Failed to save error message:", saveErr);
+      }
     } finally {
       isStreaming = false;
     }
@@ -183,26 +259,19 @@ What would you like to explore?`,
       goto(`/repo/${repoId}/docs`);
     }
   }
-
 </script>
 
-{#if loading}
+{#if loading || isLoadingMessages}
   <ChatLoadingState />
 {:else if error}
   <ChatErrorCard {error} {repoId} />
 {:else if repo && analysis}
   <ion-content class="ion-padding">
     <div class="chat-container">
-      <!-- Quick Documentation Access -->
-      <DocsShortcutCard 
-        subsystemCount={analysis.subsystems.length}
-        onNavigate={() => navigateToDocumentation()}
-      />
-
       <!-- Chat Messages -->
       <div class="messages-container" bind:this={messagesContainer}>
         {#each messages as message}
-          <ChatMessage {message} onCopy={copyMessage} />
+          <ChatMessageComponent {message} onCopy={copyMessage} />
         {/each}
 
         <!-- Streaming indicator -->
@@ -214,55 +283,23 @@ What would you like to explore?`,
   </ion-content>
 
   <!-- Fixed Input Area -->
-  <ChatInput 
+  <ChatInput
     {currentMessage}
     {isStreaming}
-    onMessageChange={(message) => currentMessage = message}
+    onMessageChange={(message) => (currentMessage = message)}
     onSendMessage={sendMessage}
     onKeyPress={handleKeyPress}
   />
 {/if}
 
 <style lang="scss">
-  // Chat Container
-  .chat-container {
-    max-width: 800px;
-    margin: 0 auto;
-    padding-bottom: 120px; // Space for fixed input
-  }
-
   // Messages Container
   .messages-container {
     display: flex;
     flex-direction: column;
     gap: 16px;
-    max-height: calc(100vh - 300px);
     overflow-y: auto;
     scroll-behavior: smooth;
-  }
-
-  // Mobile Responsiveness
-  @media (max-width: 768px) {
-    .chat-container {
-      padding-bottom: 140px;
-    }
-  }
-
-  // Scrollbar Styling
-  .messages-container::-webkit-scrollbar {
-    width: 4px;
-  }
-
-  .messages-container::-webkit-scrollbar-track {
-    background: transparent;
-  }
-
-  .messages-container::-webkit-scrollbar-thumb {
-    background: var(--ion-color-medium-tint);
-    border-radius: 2px;
-  }
-
-  .messages-container::-webkit-scrollbar-thumb:hover {
-    background: var(--ion-color-medium);
+    padding-bottom: 75px;
   }
 </style>
