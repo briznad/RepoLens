@@ -1,10 +1,8 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import { goto } from "$app/navigation";
-  import type { FirestoreRepo, AnalysisStatus } from "$types/repository";
-  import type { AnalysisResult, Subsystem } from "$types/analysis";
-  import type { NavigationSubItem, NavigationItem } from "$types/navigation";
-  import { codeSlashOutline, closeOutline } from "ionicons/icons";
+  import type { FirestoreRepo } from "$types/repository";
+  import type { AnalysisResult } from "$types/analysis";
+  import { closeOutline } from "ionicons/icons";
 
   // Import components
   import RepoInfoSection from "$components/repo/InfoSection.svelte";
@@ -17,7 +15,6 @@
     data: {
       repo: FirestoreRepo;
       analysis: AnalysisResult;
-      analysisStale: boolean;
       repoId: string;
       currentPath: string;
     };
@@ -26,7 +23,7 @@
   let { children, data }: Props = $props();
 
   // Extract data from load function
-  let { repo, repoId, currentPath, analysis, analysisStale } = $derived(data);
+  let { repo, repoId, currentPath, analysis } = $derived(data);
 
   // State management
   let refreshing = $state(false);
@@ -58,11 +55,13 @@
     </ion-header>
 
     <ion-content>
-      <RepoInfoSection {repo} {analysis} {analysisStale} {formatTimestamp} />
+      {#if repo}
+        <RepoInfoSection {repo} {analysis} {formatTimestamp} />
 
-      <NavigationList {repoId} {analysis} {currentPath} />
+        <NavigationList {repoId} {analysis} {currentPath} />
 
-      <QuickActions {repo} {refreshing} />
+        <QuickActions {repo} {refreshing} />
+      {/if}
     </ion-content>
   </ion-menu>
 
@@ -102,7 +101,4 @@
     }
   }
 
-  ion-title ion-icon {
-    vertical-align: middle;
-  }
 </style>
