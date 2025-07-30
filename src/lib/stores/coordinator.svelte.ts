@@ -3,12 +3,12 @@
  */
 
 // Export reactive stores
-export { repositoryStore } from '$stores/repository';
-export { documentationStore } from '$stores/documentation';
-export { chatStore } from '$stores/chat';
-export { navigationStore } from '$stores/navigation';
-export { searchStore } from '$stores/search';
-export { preferencesStore } from '$stores/preferences';
+export { repositoryStore } from '$stores/repository.svelte';
+export { documentationStore } from '$stores/documentation.svelte';
+export { chatStore } from '$stores/chat.svelte';
+export { navigationStore } from '$stores/navigation.svelte';
+export { searchStore } from '$stores/search.svelte';
+export { preferencesStore } from '$stores/preferences.svelte';
 
 // Export business logic managers
 export { repositoryManager } from '$services/repository-manager';
@@ -24,11 +24,11 @@ import { chatManager } from '$services/chat-manager';
 import { documentationManager } from '$services/documentation-manager';
 import { navigationManager } from '$services/navigation-manager';
 import { cache } from '$services/cache';
-import { searchStore } from '$stores/search';
-import { preferencesStore } from '$stores/preferences';
+import { searchStore } from '$stores/search.svelte';
+import { preferencesStore } from '$stores/preferences.svelte';
 
 // Export utility functions directly from repository manager for backward compatibility
-export const { 
+export const {
   isRepoLoaded,
   getRepoDocId,
   isRepoAnalyzed,
@@ -39,21 +39,13 @@ export const {
   hasFramework
 } = repositoryManager;
 
-// For backward compatibility - export stores with old names
-export { repositoryStore as currentRepo } from '$stores/repository';
-export { documentationStore as documentationData } from '$stores/documentation';
-export { chatStore as chatHistory } from '$stores/chat';
-export { navigationStore as navigationState } from '$stores/navigation';
-export { searchStore as searchState } from '$stores/search';
-export { preferencesStore as userPreferences } from '$stores/preferences';
-
 // Initialize function
 export function initializeStores(): void {
   repositoryManager.initialize();
   chatManager.initialize();
   documentationManager.initialize();
   navigationManager.initialize();
-  
+
   // Cleanup cache on startup
   cache.cleanup();
 }
