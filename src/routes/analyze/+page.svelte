@@ -1,25 +1,33 @@
 <script lang="ts">
   import type { AnalysisResult } from "$types/analysis";
-  import type { RepoData } from "$types/repository";
+  import type { RepoData, FirestoreRepo } from "$types/repository";
   import { onMount } from "svelte";
-  import { page } from "$app/stores";
   import { goto } from "$app/navigation";
   import { parseGitHubUrl } from "$utilities/github-utils";
   import { fetchRepo } from "$services/github-api";
   import {
-    findOrCreateRepo,
     checkRepoFreshness,
     updateRepoWithAnalysis,
     getRepoById,
     updateAnalysisStatus,
   } from "$services/repository";
-  import AnalysisProgress from '$components/analysis/Progress.svelte';
-  import AnalysisStatus from '$components/analysis/Status.svelte';
-  import AnalysisSteps from '$components/analysis/Steps.svelte';
-  import AnalysisError from '$components/analysis/Error.svelte';
+  import AnalysisProgress from "$components/analysis/Progress.svelte";
+  import AnalysisStatus from "$components/analysis/Status.svelte";
+  import AnalysisSteps from "$components/analysis/Steps.svelte";
+  import AnalysisError from "$components/analysis/Error.svelte";
+  import { sleep } from "briznads-helpers";
 
-  let repoUrl = $state("");
-  let repoDocId = $state("");
+  interface Props {
+    data: {
+      repoUrl: string;
+      repoDocId: string;
+      repo: FirestoreRepo;
+    };
+  }
+
+  let { data }: Props = $props();
+
+  const { repoUrl, repoDocId, repo } = data;
   let analysisStep = $state("Initializing...");
   let progress = $state(0);
   let error = $state("");
@@ -46,54 +54,66 @@
 
       // Step 1: Check repository freshness
       updateProgress(0);
+
       await updateAnalysisStatus(repoDocId, "analyzing");
-      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      await sleep(500);
 
       // Step 2: Fetch latest GitHub data
       updateProgress(1);
+
       const analysisResult: AnalysisResult = await fetchRepo(owner, repo);
       const githubData: RepoData = analysisResult.metadata;
 
       // Check if we need fresh analysis
       const isFresh = await checkRepoFreshness(repoDocId, githubData);
+
       if (isFresh) {
         skipAnalysis = true;
+
         updateProgress(5, "Repository is up to date!");
+
         isComplete = true;
 
         // Redirect to results
-        setTimeout(() => {
-          goto(`/repo/${repoDocId}`);
-        }, 800);
+        await sleep(800);
+
+        goto(`/repo/${repoDocId}`);
+
         return;
       }
 
       // Step 3: Detect framework
       updateProgress(2, `Detected framework: ${analysisResult.framework}`);
-      await new Promise((resolve) => setTimeout(resolve, 800));
+
+      await sleep(800);
 
       // Step 4: Analyze file structure
       updateProgress(3, `Analyzing ${analysisResult.fileTree.length} files...`);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      await sleep(1000);
 
       // Step 5: Generate insights
       updateProgress(
         4,
         `Processing ${Object.keys(analysisResult.languages).length} languages...`
       );
-      await new Promise((resolve) => setTimeout(resolve, 1200));
+
+      await sleep(1200);
 
       // Step 6: Save analysis results
       updateProgress(5);
+
       await updateRepoWithAnalysis(repoDocId, githubData, analysisResult);
-      await new Promise((resolve) => setTimeout(resolve, 500));
+
+      await sleep(500);
 
       isComplete = true;
 
       // Redirect to results
-      setTimeout(() => {
-        goto(`/repo/${repoDocId}`);
-      }, 1000);
+      await sleep(1000);
+
+      goto(`/repo/${repoDocId}`);
     } catch (err) {
       // Handle specific error types
       if (err instanceof Error) {
@@ -143,64 +163,20 @@
 
   const initializeAnalysis = async () => {
     try {
-      // Get URL and docId from query params
-      repoUrl = $page.url.searchParams.get("url") || "";
-      repoDocId = $page.url.searchParams.get("docId") || "";
-
-      if (!repoUrl) {
-        error =
-          "No repository URL provided. Please return to the home page and enter a valid GitHub repository URL.";
-        return;
-      }
-
-      // Validate GitHub URL format
-      try {
-        parseGitHubUrl(repoUrl);
-      } catch (err) {
-        error =
-          err instanceof Error
-            ? err.message
-            : "Invalid GitHub repository URL format";
-        return;
-      }
-
-      // If no docId, find or create repository
-      if (!repoDocId) {
-        try {
-          analysisStep = "Setting up repository...";
-          repoDocId = await findOrCreateRepo(repoUrl);
-        } catch (err) {
-          if (err instanceof Error) {
-            if (err.message.includes("Invalid GitHub URL")) {
-              error =
-                "Invalid repository URL. Please check the URL format and try again.";
-            } else if (err.message.includes("rate limit")) {
-              error = "GitHub API rate limit exceeded. Please try again later.";
-            } else {
-              error = `Failed to initialize repository: ${err.message}`;
-            }
-          } else {
-            error = "Failed to initialize repository. Please try again.";
-          }
-          return;
-        }
-      }
-
-      // Verify repository exists in Firestore
-      const firestoreRepo = await getRepoById(repoDocId);
-      if (!firestoreRepo) {
-        error =
-          "Repository not found in database. This may be a system error - please try again.";
-        return;
-      }
-
       // Check if analysis is already in progress by another process
-      if (firestoreRepo.analysisStatus === "analyzing") {
+      // But not if this is a newly created repo (which would have empty analysis data)
+      if (
+        repo.analysisStatus === "analyzing" &&
+        repo.analysisData?.fileCount > 0
+      ) {
+        console.debug(2);
         analysisStep = "Analysis already in progress...";
         // Wait a bit and redirect to results page
-        setTimeout(() => {
-          goto(`/repo/${repoDocId}`);
-        }, 2000);
+
+        await sleep(2000);
+
+        goto(`/repo/${repoDocId}`);
+
         return;
       }
 
@@ -239,7 +215,7 @@
 
       <ion-card-content>
         {#if error}
-          <AnalysisError 
+          <AnalysisError
             {error}
             onGoHome={() => goto("/")}
             onRetry={() => initializeAnalysis()}
@@ -279,5 +255,4 @@
     word-break: break-all;
     margin-bottom: 20px;
   }
-
 </style>

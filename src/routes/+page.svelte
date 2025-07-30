@@ -87,7 +87,6 @@
   const handleRecentRepoClick = (repo: FirestoreRepo) => {
     goto(`/repo/${repo.id}`);
   };
-
 </script>
 
 <ion-content class="ion-padding">
@@ -96,17 +95,17 @@
     <HeroSection />
 
     <!-- URL Input Section -->
-    <RepositoryUrlInput 
+    <RepositoryUrlInput
       {repoUrl}
       {isLoading}
       {error}
       onSubmit={handleSubmit}
-      onUrlChange={(url) => repoUrl = url}
+      onUrlChange={(url) => (repoUrl = url || "")}
     />
 
     <!-- Recent Repositories Section -->
     {#if !loadingRecent}
-      <RecentRepositoriesList 
+      <RecentRepositoriesList
         repositories={recentRepos}
         onRepoClick={handleRecentRepoClick}
       />
@@ -123,5 +122,4 @@
     margin: 0 auto;
     padding: 20px;
   }
-
 </style>

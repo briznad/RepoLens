@@ -22,7 +22,7 @@
   }: Props = $props();
 </script>
 
-<ion-list class="actions-list">
+<ion-list>
   <ion-list-header>
     <ion-label>Actions</ion-label>
   </ion-list-header>
@@ -61,35 +61,30 @@
 </ion-list>
 
 <style lang="scss">
-  .actions-list {
-    margin-top: auto;
-    padding-top: 16px;
+  ion-list {
+    background: transparent;
+  }
 
-    ion-list-header {
-      padding-left: 16px;
-      padding-right: 16px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      color: var(--ion-color-medium);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
+  ion-list-header {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--ion-color-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  ion-item {
+    --background: transparent;
+    --border-radius: 8px;
+    margin: 2px 8px;
+    font-size: 0.95rem;
+
+    &:hover:not(:disabled) {
+      --background: var(--ion-color-light-shade);
     }
 
-    ion-item {
-      --padding-start: 16px;
-      --padding-end: 16px;
-      --background: transparent;
-      --border-radius: 8px;
-      margin: 2px 8px;
-      font-size: 0.95rem;
-
-      &:hover:not(:disabled) {
-        --background: var(--ion-color-light-shade);
-      }
-
-      &:disabled {
-        opacity: 0.6;
-      }
+    &:disabled {
+      opacity: 0.6;
     }
   }
 </style>

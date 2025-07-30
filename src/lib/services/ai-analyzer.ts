@@ -146,9 +146,11 @@ export async function analyzeRepoWithAI(repoData: any, files: GitHubFile[] | (Gi
     // Generate AI descriptions for each subsystem
     const subsystemDescriptions: SubsystemDescription[] = [];
     for (const subsystem of basicAnalysis.subsystems) {
+      // Get actual file objects from fileTree using the file paths
+      const subsystemFiles = subsystem.files.map(filePath => basicAnalysis.fileTree[filePath]).filter(Boolean);
       const description = await generateSubsystemDescription(
         subsystem.name,
-        subsystem.files,
+        subsystemFiles,
         basicAnalysis
       );
       subsystemDescriptions.push(description);
@@ -160,9 +162,9 @@ export async function analyzeRepoWithAI(repoData: any, files: GitHubFile[] | (Gi
     // Generate citations for important files
     const citations: CitationLink[] = [];
     const importantFiles = [
-      ...basicAnalysis.mainFiles,
-      ...basicAnalysis.configFiles.slice(0, 3),
-      ...basicAnalysis.documentationFiles.slice(0, 3)
+      ...basicAnalysis.mainFiles.map(path => basicAnalysis.fileTree[path]).filter(Boolean),
+      ...basicAnalysis.configFiles.slice(0, 3).map(path => basicAnalysis.fileTree[path]).filter(Boolean),
+      ...basicAnalysis.documentationFiles.slice(0, 3).map(path => basicAnalysis.fileTree[path]).filter(Boolean)
     ];
 
     const [owner, repo] = repoData.full_name.split('/');

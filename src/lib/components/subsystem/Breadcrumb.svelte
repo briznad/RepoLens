@@ -1,40 +1,36 @@
 <script lang="ts">
-  import { home } from 'ionicons/icons';
+  import { home } from "ionicons/icons";
 
   interface Props {
     repoName: string;
     subsystemName: string;
     repoId: string;
-    onHomeClick?: () => void;
-    onRepoClick?: () => void;
   }
 
-  let { 
-    repoName,
-    subsystemName,
-    repoId,
-    onHomeClick = () => window.location.href = "/",
-    onRepoClick = () => window.location.href = `/repo/${repoId}/docs`
-  }: Props = $props();
+  let { repoName, subsystemName, repoId }: Props = $props();
 </script>
 
-<div class="breadcrumb-nav">
-  <ion-breadcrumbs>
-    <ion-breadcrumb onclick={onHomeClick}>
-      <ion-icon icon={home}></ion-icon>
-      Home
-    </ion-breadcrumb>
-    <ion-breadcrumb onclick={onRepoClick}>
-      {repoName}
-    </ion-breadcrumb>
-    <ion-breadcrumb>
-      {subsystemName}
-    </ion-breadcrumb>
-  </ion-breadcrumbs>
-</div>
+<ion-breadcrumbs>
+  <ion-breadcrumb href="/">
+    <ion-icon icon={home}></ion-icon>
+    Home
+  </ion-breadcrumb>
+
+  <ion-breadcrumb href="/repo/{repoId}/docs">
+    {repoName}
+  </ion-breadcrumb>
+
+  <ion-breadcrumb>
+    {subsystemName}
+  </ion-breadcrumb>
+</ion-breadcrumbs>
 
 <style lang="scss">
-  .breadcrumb-nav {
+  ion-breadcrumbs {
     margin-bottom: 20px;
+  }
+
+  ion-icon {
+    padding-right: 0.5em;
   }
 </style>

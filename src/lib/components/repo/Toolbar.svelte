@@ -1,20 +1,5 @@
 <script lang="ts">
-  import type { FirestoreRepo } from "$types/repository";
-
-  import {
-    logoGithub,
-    warningOutline,
-    syncOutline,
-    refreshOutline,
-  } from "ionicons/icons";
-
-  interface Props {
-    repo: FirestoreRepo;
-    analysisStale: boolean;
-    refreshing?: boolean;
-  }
-
-  let { repo, analysisStale, refreshing = false }: Props = $props();
+  import { codeSlashOutline } from "ionicons/icons";
 </script>
 
 <ion-toolbar>
@@ -23,77 +8,14 @@
   </ion-buttons>
 
   <ion-title>
-    <div class="header-title">
-      <span class="repo-name">{repo.fullName}</span>
-      <div class="header-meta">
-        {#if analysisStale}
-          <ion-chip color="warning" size="small">
-            <ion-icon icon={warningOutline}></ion-icon>
-            <ion-label>Analysis may be outdated</ion-label>
-          </ion-chip>
-        {/if}
-        {#if repo.analysisStatus === "analyzing"}
-          <ion-chip color="primary" size="small">
-            <ion-icon icon={syncOutline}></ion-icon>
-            <ion-label>Analysis in progress</ion-label>
-          </ion-chip>
-        {/if}
-      </div>
-    </div>
+    <ion-icon icon={codeSlashOutline}></ion-icon>
+
+    RepoLens
   </ion-title>
-
-  <ion-buttons slot="end">
-    <ion-button
-      fill="clear"
-      href={repo.url}
-      target="_blank"
-      title="View on GitHub"
-    >
-      <ion-icon icon={logoGithub} slot="icon-only"></ion-icon>
-    </ion-button>
-
-    {#if analysisStale && repo.analysisStatus !== "analyzing"}
-      <ion-button
-        fill="clear"
-        color="warning"
-        href="/analyze?docId={repo.id}"
-        title="Refresh Analysis"
-        disabled={refreshing}
-      >
-        <ion-icon icon={refreshOutline} slot="icon-only"></ion-icon>
-      </ion-button>
-    {/if}
-  </ion-buttons>
 </ion-toolbar>
 
-<style lang="scss">
-  .header-title {
-    display: flex;
-    align-items: center;
-    gap: 0.5em;
-
-    .repo-name {
-      font-size: 1.1rem;
-      font-weight: 600;
-    }
-
-    .header-meta {
-      display: flex;
-      gap: 4px;
-      margin-top: 2px;
-    }
-
-    @media (max-width: 768px) {
-      .repo-name {
-        font-size: 0.95rem;
-      }
-
-      .header-meta {
-        ion-chip {
-          font-size: 0.7rem;
-          height: 20px;
-        }
-      }
-    }
+<style>
+  ion-icon {
+    vertical-align: middle;
   }
 </style>

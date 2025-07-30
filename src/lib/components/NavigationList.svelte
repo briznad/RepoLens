@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { NavigationItem } from "$types/navigation";
+  import type { AnalysisResult } from "$types/analysis";
 
   import {
     libraryOutline,
@@ -7,16 +7,47 @@
     gitNetworkOutline,
   } from "ionicons/icons";
 
+  import NavigationItem from "$components/NavigationItem.svelte";
+
   interface Props {
-    items: NavigationItem[];
+    repoId: string;
     currentPath: string;
+    analysis: AnalysisResult;
   }
 
-  let { items, currentPath }: Props = $props();
+  let { repoId, currentPath, analysis }: Props = $props();
 
-  $effect(() => {
-    console.debug(currentPath);
-  });
+  // Get subsystems for documentation menu
+  const subitems = $derived(
+    (analysis?.subsystems ?? []).map((subsystem) => ({
+      title: subsystem.name,
+      href: `/repo/${repoId}/docs/${encodeURIComponent(subsystem.name)}`,
+      metadata: `${subsystem.files.length} files`,
+    }))
+  );
+
+  // Navigation structure prioritizing documentation
+  const items = $derived([
+    {
+      title: "Chat with Iris",
+      href: `/repo/${repoId}`,
+      type: "chat",
+      primary: false,
+    },
+    {
+      title: "Architecture Overview",
+      href: `/repo/${repoId}/graph`,
+      type: "architecture",
+      primary: false,
+    },
+    {
+      title: "Files",
+      href: `/repo/${repoId}/docs`,
+      type: "documentation",
+      primary: true,
+      subitems,
+    },
+  ]);
 
   // Determine if a subsystem is currently selected
   const isCurrentSubsystem = (subsystemName: string): boolean => {
@@ -32,139 +63,49 @@
   };
 </script>
 
-<ion-list class="navigation-list">
-  {#each items as section}
-    {@const itemIcon = iconMap[section.type]}
+<ion-list>
+  <ion-list-header>
+    <ion-label>Navigation</ion-label>
+  </ion-list-header>
 
-    <div class="nav-section">
-      <ion-item
-        href={section.href}
-        class:selected={currentPath === section.href}
-        color={currentPath === section.href ? "medium" : undefined}
-      >
-        {#if itemIcon}
-          <ion-icon icon={itemIcon} slot="start"></ion-icon>
-        {/if}
+  {#each items as item}
+    <NavigationItem {item} selected={currentPath === item.href} />
 
-        <ion-label class="nav-label">
-          <div class="nav-title">{section.title}</div>
-
-          {#if section.subitems}
-            <div class="nav-subtitle">
-              {section.subitems.length} subsystems
-            </div>
-          {/if}
-        </ion-label>
-      </ion-item>
-
-      <!-- Subitems (subsystems) -->
-      {#if section.subitems && section.subitems.length > 0}
-        <div class="subitems-menu">
-          {#each section.subitems as subitem}
-            <ion-item
-              class="subitem"
-              class:selected={isCurrentSubsystem(subitem.title)}
-              href={subitem.href}
-            >
-              <ion-icon icon={libraryOutline} slot="start"></ion-icon>
-
-              <ion-label>
-                <div class="subitem-name">{subitem.title}</div>
-
-                {#if subitem.metadata}
-                  <div class="subitem-info">{subitem.metadata}</div>
-                {/if}
-              </ion-label>
-            </ion-item>
-          {/each}
-        </div>
-      {/if}
-    </div>
+    <!-- Subitems (subsystems) -->
+    {#if item.subitems && item.subitems.length > 0}
+      <ion-item-group>
+        {#each item.subitems as subitem}
+          <NavigationItem
+            {subitem}
+            selected={isCurrentSubsystem(subitem.title)}
+          />
+        {/each}
+      </ion-item-group>
+    {/if}
   {/each}
 </ion-list>
 
 <style lang="scss">
-  .navigation-list {
-    margin-bottom: 20px;
+  ion-list {
+    background: transparent;
   }
 
-  .nav-section {
-    margin-bottom: 4px;
-
-    ion-item {
-      --padding-start: 16px;
-      --padding-end: 16px;
-      --background: transparent;
-      --border-radius: 8px;
-      margin: 0 8px;
-      font-weight: 500;
-
-      &.selected {
-        pointer-events: none;
-        font-weight: 600;
-      }
-
-      &:hover:not(.selected) {
-        --background: var(--ion-color-light-shade);
-      }
-    }
-  }
-
-  .nav-label {
-    .nav-title {
-      font-size: 1rem;
-      font-weight: inherit;
-    }
-
-    .nav-subtitle {
-      font-size: 0.85rem;
-      color: var(--ion-color-medium);
-      margin-top: 2px;
-    }
-  }
-
-  .nav-arrow {
-    font-size: 0.9rem;
+  ion-list-header {
+    padding-left: 16px;
+    padding-right: 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
     color: var(--ion-color-medium);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  ion-item-group {
+    margin-top: 4px;
+    margin-left: 16px;
   }
 
   .subitems-menu {
-    background: var(--ion-color-light-shade);
-    border-radius: 8px;
-    margin: 8px 16px 0 16px;
-    overflow: hidden;
-  }
-
-  .subitem {
-    --padding-start: 20px;
-    --padding-end: 16px;
-    --background: transparent;
-    font-size: 0.9rem;
-    border-bottom: 1px solid var(--ion-color-light);
-
-    &:last-child {
-      border-bottom: none;
-    }
-
-    &.selected {
-      --background: var(--ion-color-primary-tint);
-      --color: var(--ion-color-primary);
-      font-weight: 600;
-    }
-
-    &:hover:not(.selected) {
-      --background: var(--ion-color-light);
-    }
-
-    .subitem-name {
-      font-weight: 500;
-      line-height: 1.2;
-    }
-
-    .subitem-info {
-      font-size: 0.8rem;
-      color: var(--ion-color-medium);
-      margin-top: 2px;
-    }
+    margin-left: 16px;
   }
 </style>

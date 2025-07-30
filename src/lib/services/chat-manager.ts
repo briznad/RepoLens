@@ -1,5 +1,5 @@
 import type { ChatMessage } from '$types/chat';
-import { chatStore } from '$stores/chat';
+import { chatStore } from '$stores/chat.svelte';
 import { persistence } from './persistence';
 import { validateChatMessage, validateSessionId } from '$utilities/validation';
 import { StoreError } from '$types/error';
@@ -15,10 +15,10 @@ export class ChatManager {
    */
   createSession(repoId: string): string {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     chatStore.createSession(sessionId, repoId);
     chatStore.setCurrentSession(sessionId);
-    
+
     persistence.save('chatHistory', chatStore.value);
     return sessionId;
   }
@@ -29,12 +29,12 @@ export class ChatManager {
   setCurrentSession(sessionId: string | null): void {
     if (sessionId) {
       validateSessionId(sessionId);
-      
+
       if (!chatStore.getSession(sessionId)) {
         throw new StoreError('Chat session not found', 'SESSION_NOT_FOUND', { sessionId });
       }
     }
-    
+
     chatStore.setCurrentSession(sessionId);
     persistence.save('chatHistory', chatStore.value);
   }
@@ -44,19 +44,19 @@ export class ChatManager {
    */
   addMessage(message: ChatMessage): void {
     const currentSession = chatStore.value.currentSession;
-    
+
     if (!currentSession) {
       throw new StoreError('No active chat session', 'NO_SESSION');
     }
 
     validateChatMessage(message);
-    
+
     chatStore.addMessage(currentSession, message);
-    
+
     // Limit message history based on preferences
     const maxSize = chatStore.value.preferences.maxHistorySize;
     chatStore.limitSessionMessages(currentSession, maxSize);
-    
+
     persistence.save('chatHistory', chatStore.value);
   }
 
@@ -153,12 +153,12 @@ export class ChatManager {
     };
 
     const persistedState = persistence.load('chatHistory', defaultState);
-    
+
     // Restore sessions
     if (persistedState.sessions instanceof Map) {
       for (const [sessionId, sessionData] of persistedState.sessions) {
         chatStore.createSession(sessionId, sessionData.repoId);
-        
+
         // Add messages
         for (const message of sessionData.messages) {
           chatStore.addMessage(sessionId, message);

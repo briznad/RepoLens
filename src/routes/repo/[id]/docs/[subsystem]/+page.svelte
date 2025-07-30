@@ -1,50 +1,72 @@
 <script lang="ts">
-  import { page } from "$app/stores";
-  import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { getRepoById } from "$lib/services/repository";
   import { generateInlineCitations } from "$utilities/repo-analyzer";
   import { makeOpenAIRequest } from "$services/ai-analyzer";
   import type { FirestoreRepo, GitHubFile } from "$types/repository";
   import type {
     AnalysisResult,
-    Subsystem,
+    SubsystemReference,
     SubsystemDescription,
     FileInterface,
     CitationLink,
   } from "$types/analysis";
-  import SubsystemLoadingState from '$components/subsystem/LoadingState.svelte';
-  import SubsystemErrorCard from '$components/subsystem/ErrorCard.svelte';
-  import SubsystemBreadcrumb from '$components/subsystem/Breadcrumb.svelte';
-  import SubsystemHeader from '$components/subsystem/Header.svelte';
-  import AIGenerationStatus from '$components/AIGenerationStatus.svelte';
-  import SubsystemOverview from '$components/subsystem/Overview.svelte';
-  import { 
-    folderOutline, 
-    codeSlashOutline, 
-    codeWorkingOutline, 
-    gitNetworkOutline, 
+  import { getSubsystemFiles } from "$utilities/repo-analyzer";
+  import SubsystemLoadingState from "$components/subsystem/LoadingState.svelte";
+  import SubsystemErrorCard from "$components/subsystem/ErrorCard.svelte";
+  import SubsystemBreadcrumb from "$components/subsystem/Breadcrumb.svelte";
+  import SectionHeader from "$components/subsystem/SectionHeader.svelte";
+  import AIGenerationStatus from "$components/AIGenerationStatus.svelte";
+  import SubsystemOverview from "$components/subsystem/Overview.svelte";
+  import FileCard from "$components/subsystem/FileCard.svelte";
+  import {
+    folderOutline,
+    codeSlashOutline,
+    codeWorkingOutline,
+    gitNetworkOutline,
     arrowForward,
     logoGithub,
-    openOutline
-  } from 'ionicons/icons';
+    openOutline,
+    layersOutline,
+    chevronUp,
+    chevronDown,
+    checkmark,
+    copy,
+  } from "ionicons/icons";
 
-  const repoId = $derived($page.params.id);
-  const subsystemName = $derived(
-    $page.params.subsystem ? decodeURIComponent($page.params.subsystem) : ""
+  interface Props {
+    data: {
+      repo: FirestoreRepo;
+      analysis: AnalysisResult;
+      subsystem: SubsystemReference;
+      subsystemDescription: SubsystemDescription | null;
+      repoId: string;
+      subsystemName: string;
+    };
+  }
+
+  let { data }: Props = $props();
+
+  let {
+    repo,
+    analysis,
+    subsystem,
+    subsystemDescription,
+    repoId,
+    subsystemName,
+  } = $derived(data);
+
+  // Get actual file objects from the fileTree using the subsystem's file keys
+  let subsystemFiles = $derived(
+    subsystem && analysis ? getSubsystemFiles(subsystem, analysis.fileTree) : []
   );
 
-  // State management
-  let repo = $state<FirestoreRepo | null>(null);
-  let analysis = $state<AnalysisResult | null>(null);
-  let subsystem = $state<Subsystem | null>(null);
-  let subsystemDescription = $state<SubsystemDescription | null>(null);
-  let loading = $state(true);
-  let error = $state<string | null>(null);
+  // Get stored file explanations from analysis data
+  let storedExplanations = $derived((analysis as any)?.fileExplanations || {});
+
+  // AI generation state
   let generatingAI = $state(false);
 
-  // Enhanced content state
-  let fileExplanations = $state<Record<string, string>>({});
+  // Enhanced content state (removing fileExplanations since it's now handled per-file)
   let functionExplanations = $state<Record<string, string>>({});
   let usageExamples = $state<string[]>([]);
   let relatedSubsystems = $state<string[]>([]);
@@ -52,54 +74,12 @@
 
   // UI state
   let expandedSections = $state<Set<string>>(new Set(["overview", "files"]));
-  let expandedFiles = $state<Set<string>>(new Set());
   let copiedStates = $state<Record<string, boolean>>({});
 
-  // Load repository and subsystem data
-  onMount(async () => {
-    if (!repoId || !subsystemName) {
-      error = "Repository ID or subsystem name not found";
-      loading = false;
-      return;
-    }
-
-    try {
-      const repoData = await getRepoById(repoId);
-      if (!repoData) {
-        error = "Repository not found";
-        loading = false;
-        return;
-      }
-
-      repo = repoData;
-      analysis = repoData.analysisData || null;
-
-      if (analysis) {
-        // Find the specific subsystem
-        const foundSubsystem = analysis.subsystems.find(
-          (s) => s.name === subsystemName
-        );
-        if (!foundSubsystem) {
-          error = `Subsystem "${subsystemName}" not found`;
-          loading = false;
-          return;
-        }
-
-        subsystem = foundSubsystem;
-
-        // Find AI-generated description
-        subsystemDescription =
-          analysis.subsystemDescriptions?.find(
-            (desc) => desc.name === subsystemName
-          ) || null;
-
-        // Generate enhanced documentation
-        await generateEnhancedDocumentation();
-      }
-    } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to load subsystem";
-    } finally {
-      loading = false;
+  // Generate enhanced documentation on component initialization
+  $effect(() => {
+    if (subsystem && analysis) {
+      generateEnhancedDocumentation();
     }
   });
 
@@ -110,9 +90,6 @@
     generatingAI = true;
 
     try {
-      // Generate file explanations
-      await generateFileExplanations();
-
       // Generate function explanations
       await generateFunctionExplanations();
 
@@ -131,33 +108,6 @@
     }
   }
 
-  async function generateFileExplanations() {
-    if (!subsystem || !repo) return;
-
-    const keyFiles = subsystem.files.slice(0, 8); // Limit for performance
-    const [owner, repoName] = repo.fullName.split("/");
-
-    for (const file of keyFiles) {
-      const prompt = `Explain the purpose and role of this file in a ${analysis?.framework} project:
-
-File: ${file.path}
-Project: ${repo.fullName}
-Framework: ${analysis?.framework}
-Subsystem: ${subsystemName}
-
-Provide a concise, technical explanation (2-3 sentences) of what this file does and why it's important in this subsystem. Focus on its specific role and functionality.`;
-
-      try {
-        const response = await makeOpenAIRequest(prompt);
-        if (response.success && response.data) {
-          fileExplanations[file.path] = response.data.trim();
-        }
-      } catch (err) {
-        console.warn(`Failed to generate explanation for ${file.path}:`, err);
-      }
-    }
-  }
-
   async function generateFunctionExplanations() {
     if (!analysis?.keyInterfaces || !subsystem) return;
 
@@ -165,7 +115,7 @@ Provide a concise, technical explanation (2-3 sentences) of what this file does 
     const subsystemInterfaces =
       analysis.keyInterfaces
         ?.filter((iface) =>
-          subsystem?.files?.some((file) => file.path === iface.filePath)
+          subsystemFiles.some((file: GitHubFile) => file.path === iface.filePath)
         )
         .slice(0, 6) || []; // Limit for performance
 
@@ -258,15 +208,15 @@ Focus on architectural concepts and system design.`;
 
     // Simple heuristic: find subsystems that share similar file patterns or are commonly related
     const currentPaths = new Set(
-      subsystem.files.map((f) => f.path.toLowerCase())
+      subsystem.files.map((f: string) => f.toLowerCase())
     );
 
     const related = analysis.subsystems
       .filter((s) => s.name !== subsystemName)
       .map((s) => {
         // Calculate relationship score based on file path similarity
-        const sharedPatterns = s.files.filter((f) => {
-          const path = f.path.toLowerCase();
+        const sharedPatterns = s.files.filter((filePath) => {
+          const path = filePath.toLowerCase();
           return Array.from(currentPaths).some(
             (cp) =>
               path.includes(cp.split("/")[0]) || cp.includes(path.split("/")[0])
@@ -293,15 +243,6 @@ Focus on architectural concepts and system design.`;
     expandedSections = new Set(expandedSections);
   }
 
-  function toggleFile(filePath: string) {
-    if (expandedFiles.has(filePath)) {
-      expandedFiles.delete(filePath);
-    } else {
-      expandedFiles.add(filePath);
-    }
-    expandedFiles = new Set(expandedFiles);
-  }
-
   async function copyToClipboard(text: string, id: string) {
     try {
       await navigator.clipboard.writeText(text);
@@ -322,103 +263,104 @@ Focus on architectural concepts and system design.`;
     return lineNumber ? `${baseUrl}#L${lineNumber}` : baseUrl;
   }
 
-  function getFileExtension(filePath: string): string {
-    return filePath.split(".").pop()?.toLowerCase() || "";
-  }
-
-  function getFileIcon(filePath: string): string {
-    const ext = getFileExtension(filePath);
-    const iconMap: Record<string, string> = {
-      js: "logo-javascript",
-      jsx: "logo-react",
-      ts: "document-text",
-      tsx: "logo-react",
-      py: "logo-python",
-      svelte: "code-slash",
-      html: "code",
-      css: "color-palette",
-      scss: "color-palette",
-      json: "document-text",
-      md: "document-text",
-      yml: "settings",
-      yaml: "settings",
-    };
-    return iconMap[ext] || "document-outline";
-  }
-
   function handleRelatedClick(relatedName: string) {
     goto(`/repo/${repoId}/docs/${encodeURIComponent(relatedName)}`);
   }
 </script>
 
 <ion-content class="ion-padding">
-  {#if loading}
-    <SubsystemLoadingState />
-  {:else if error}
-    <SubsystemErrorCard {error} {repoId} />
-  {:else if repo && analysis && subsystem}
-    <div class="subsystem-docs-container">
-      <!-- Breadcrumb Navigation -->
-      <SubsystemBreadcrumb 
-        repoName={repo.fullName}
-        {subsystemName}
-        {repoId}
-        onHomeClick={() => goto("/")}
-        onRepoClick={() => goto(`/repo/${repoId}/docs`)}
-      />
+  {#if repo && analysis && subsystem}
+    <!-- Breadcrumb Navigation -->
+    <SubsystemBreadcrumb repoName={repo.fullName} {subsystemName} {repoId} />
 
-      <!-- Header Section -->
-      <SubsystemHeader 
-        {subsystemName}
-        fileCount={subsystem.files.length}
-        framework={analysis.framework}
-        {subsystemDescription}
-        fallbackDescription={subsystem.description}
-        repoUrl={repo?.url}
-      />
+    <!-- Header Section -->
+    <SectionHeader
+      title={subsystemName}
+      subtitle={subsystemDescription?.description ?? subsystem.description}
+    />
 
-      <!-- AI Generation Status -->
-      <AIGenerationStatus isGenerating={generatingAI} />
+    <!-- AI Generation Status -->
+    <AIGenerationStatus isGenerating={generatingAI} />
 
-      <!-- Overview Section -->
-      <SubsystemOverview 
-        {subsystemDescription}
-        {architectureRole}
-        expanded={expandedSections.has("overview")}
-        onToggle={() => toggleSection("overview")}
-        onCreateGitHubLink={createGitHubLink}
-      />
+    <!-- Overview Section -->
+    <SubsystemOverview
+      {subsystemDescription}
+      {architectureRole}
+      expanded={expandedSections.has("overview")}
+      onToggle={() => toggleSection("overview")}
+      onCreateGitHubLink={createGitHubLink}
+    />
 
-      <!-- Files Section -->
+    <!-- Files Section -->
+    <ion-card class="section-card">
+      <ion-card-header>
+        <div class="section-header" onclick={() => toggleSection("files")}>
+          <ion-card-title>
+            <ion-icon icon={folderOutline}></ion-icon>
+            Files & Structure ({subsystemFiles.length})
+          </ion-card-title>
+          <ion-icon
+            icon={expandedSections.has("files") ? chevronUp : chevronDown}
+          ></ion-icon>
+        </div>
+      </ion-card-header>
+
+      {#if expandedSections.has("files")}
+        <ion-card-content>
+          <div class="files-list">
+            {#each subsystemFiles as file}
+              <FileCard
+                {file}
+                {repoId}
+                {subsystemName}
+                framework={analysis?.framework}
+                repoFullName={repo.fullName}
+                repoUrl={repo.url}
+                {storedExplanations}
+              />
+            {/each}
+          </div>
+        </ion-card-content>
+      {/if}
+    </ion-card>
+
+    <!-- Key Functions & Interfaces -->
+    {#if analysis.keyInterfaces}
       <ion-card class="section-card">
         <ion-card-header>
-          <div class="section-header" onclick={() => toggleSection("files")}>
+          <div
+            class="section-header"
+            onclick={() => toggleSection("interfaces")}
+          >
             <ion-card-title>
-              <ion-icon icon={folderOutline}></ion-icon>
-              Files & Structure ({subsystem.files.length})
+              <ion-icon icon={codeSlashOutline}></ion-icon>
+              Key Functions & Interfaces
             </ion-card-title>
             <ion-icon
-              name={expandedSections.has("files")
-                ? "chevron-up"
-                : "chevron-down"}
+              icon={expandedSections.has("interfaces")
+                ? chevronUp
+                : chevronDown}
             ></ion-icon>
           </div>
         </ion-card-header>
 
-        {#if expandedSections.has("files")}
+        {#if expandedSections.has("interfaces")}
           <ion-card-content>
-            <div class="files-list">
-              {#each subsystem.files as file}
-                <div class="file-item">
-                  <div
-                    class="file-header"
-                    onclick={() => toggleFile(file.path)}
-                  >
-                    <div class="file-info">
-                      <ion-icon name={getFileIcon(file.path)}></ion-icon>
-                      <span class="file-path">{file.path}</span>
+            <div class="interfaces-list">
+              {#each analysis.keyInterfaces?.filter( (iface) => subsystemFiles.some((file: GitHubFile) => file.path === iface.filePath) ) || [] as iface}
+                <div class="interface-item">
+                  <div class="interface-header">
+                    <div class="interface-info">
+                      <ion-chip color="primary" size="small">
+                        <ion-label>{iface.type}</ion-label>
+                      </ion-chip>
+                      <span class="interface-name">{iface.name}</span>
+                      <span class="interface-file">in {iface.filePath}</span>
                       <a
-                        href={createGitHubLink(file.path)}
+                        href={createGitHubLink(
+                          iface.filePath,
+                          iface.lineNumber
+                        )}
                         target="_blank"
                         rel="noopener"
                         class="github-link"
@@ -426,43 +368,44 @@ Focus on architectural concepts and system design.`;
                         <ion-icon icon={logoGithub}></ion-icon>
                       </a>
                     </div>
-                    <ion-icon
-                      name={expandedFiles.has(file.path)
-                        ? "chevron-up"
-                        : "chevron-down"}
-                      class="expand-icon"
-                    ></ion-icon>
                   </div>
 
-                  {#if expandedFiles.has(file.path)}
-                    <div class="file-details">
-                      {#if fileExplanations[file.path]}
-                        <div class="file-explanation">
-                          <h5>Purpose</h5>
-                          <p>{fileExplanations[file.path]}</p>
-                        </div>
-                      {:else}
-                        <div class="file-explanation">
-                          <p class="generating">Generating explanation...</p>
-                        </div>
-                      {/if}
+                  {#if iface.signature}
+                    <div class="interface-signature">
+                      <pre><code>{iface.signature}</code></pre>
+                      <ion-button
+                        size="small"
+                        fill="clear"
+                        onclick={() =>
+                          copyToClipboard(
+                            iface.signature || "",
+                            `sig-${iface.name}`
+                          )}
+                      >
+                        <ion-icon
+                          icon={copiedStates[`sig-${iface.name}`]
+                            ? checkmark
+                            : copy}
+                          slot="start"
+                        ></ion-icon>
+                        {copiedStates[`sig-${iface.name}`] ? "Copied!" : "Copy"}
+                      </ion-button>
+                    </div>
+                  {/if}
 
-                      <div class="file-actions">
-                        <ion-button
-                          size="small"
-                          fill="clear"
-                          onclick={() =>
-                            window.open(createGitHubLink(file.path), "_blank")}
-                        >
-                          <ion-icon icon={openOutline} slot="start"></ion-icon>
-                          View on GitHub
-                        </ion-button>
-                        {#if file.size}
-                          <span class="file-size"
-                            >{(file.size / 1024).toFixed(1)} KB</span
-                          >
-                        {/if}
-                      </div>
+                  {#if functionExplanations[`${iface.filePath}:${iface.name}`]}
+                    <div class="interface-explanation">
+                      <p>
+                        {functionExplanations[
+                          `${iface.filePath}:${iface.name}`
+                        ]}
+                      </p>
+                    </div>
+                  {:else if !generatingAI}
+                    <div class="interface-explanation">
+                      <p class="fallback">
+                        No detailed explanation available for this {iface.type}.
+                      </p>
                     </div>
                   {/if}
                 </div>
@@ -471,190 +414,85 @@ Focus on architectural concepts and system design.`;
           </ion-card-content>
         {/if}
       </ion-card>
+    {/if}
 
-      <!-- Key Functions & Interfaces -->
-      {#if analysis.keyInterfaces}
-        <ion-card class="section-card">
-          <ion-card-header>
-            <div
-              class="section-header"
-              onclick={() => toggleSection("interfaces")}
-            >
-              <ion-card-title>
-                <ion-icon icon={codeSlashOutline}></ion-icon>
-                Key Functions & Interfaces
-              </ion-card-title>
-              <ion-icon
-                name={expandedSections.has("interfaces")
-                  ? "chevron-up"
-                  : "chevron-down"}
-              ></ion-icon>
-            </div>
-          </ion-card-header>
-
-          {#if expandedSections.has("interfaces")}
-            <ion-card-content>
-              <div class="interfaces-list">
-                {#each analysis.keyInterfaces?.filter( (iface) => subsystem?.files?.some((file) => file.path === iface.filePath) ) || [] as iface}
-                  <div class="interface-item">
-                    <div class="interface-header">
-                      <div class="interface-info">
-                        <ion-chip color="primary" size="small">
-                          <ion-label>{iface.type}</ion-label>
-                        </ion-chip>
-                        <span class="interface-name">{iface.name}</span>
-                        <span class="interface-file">in {iface.filePath}</span>
-                        <a
-                          href={createGitHubLink(
-                            iface.filePath,
-                            iface.lineNumber
-                          )}
-                          target="_blank"
-                          rel="noopener"
-                          class="github-link"
-                        >
-                          <ion-icon icon={logoGithub}></ion-icon>
-                        </a>
-                      </div>
-                    </div>
-
-                    {#if iface.signature}
-                      <div class="interface-signature">
-                        <pre><code>{iface.signature}</code></pre>
-                        <ion-button
-                          size="small"
-                          fill="clear"
-                          onclick={() =>
-                            copyToClipboard(
-                              iface.signature || "",
-                              `sig-${iface.name}`
-                            )}
-                        >
-                          <ion-icon
-                            name={copiedStates[`sig-${iface.name}`]
-                              ? "checkmark"
-                              : "copy"}
-                            slot="start"
-                          ></ion-icon>
-                          {copiedStates[`sig-${iface.name}`]
-                            ? "Copied!"
-                            : "Copy"}
-                        </ion-button>
-                      </div>
-                    {/if}
-
-                    {#if functionExplanations[`${iface.filePath}:${iface.name}`]}
-                      <div class="interface-explanation">
-                        <p>
-                          {functionExplanations[
-                            `${iface.filePath}:${iface.name}`
-                          ]}
-                        </p>
-                      </div>
-                    {:else if !generatingAI}
-                      <div class="interface-explanation">
-                        <p class="fallback">
-                          No detailed explanation available for this {iface.type}.
-                        </p>
-                      </div>
-                    {/if}
-                  </div>
-                {/each}
-              </div>
-            </ion-card-content>
-          {/if}
-        </ion-card>
-      {/if}
-
-      <!-- Usage Examples -->
-      {#if usageExamples.length > 0}
-        <ion-card class="section-card">
-          <ion-card-header>
-            <div
-              class="section-header"
-              onclick={() => toggleSection("examples")}
-            >
-              <ion-card-title>
-                <ion-icon icon={codeWorkingOutline}></ion-icon>
-                Usage Examples
-              </ion-card-title>
-              <ion-icon
-                name={expandedSections.has("examples")
-                  ? "chevron-up"
-                  : "chevron-down"}
-              ></ion-icon>
-            </div>
-          </ion-card-header>
-
-          {#if expandedSections.has("examples")}
-            <ion-card-content>
-              <div class="examples-list">
-                {#each usageExamples as example, index}
-                  <div class="example-item">
-                    <div class="example-header">
-                      <h5>Example {index + 1}</h5>
-                      <ion-button
-                        size="small"
-                        fill="clear"
-                        onclick={() =>
-                          copyToClipboard(example, `example-${index}`)}
-                      >
-                        <ion-icon
-                          name={copiedStates[`example-${index}`]
-                            ? "checkmark"
-                            : "copy"}
-                          slot="start"
-                        ></ion-icon>
-                        {copiedStates[`example-${index}`] ? "Copied!" : "Copy"}
-                      </ion-button>
-                    </div>
-                    <div class="example-code">
-                      <pre><code>{example}</code></pre>
-                    </div>
-                  </div>
-                {/each}
-              </div>
-            </ion-card-content>
-          {/if}
-        </ion-card>
-      {/if}
-
-      <!-- Related Subsystems -->
-      {#if relatedSubsystems.length > 0}
-        <ion-card class="section-card">
-          <ion-card-header>
+    <!-- Usage Examples -->
+    {#if usageExamples.length > 0}
+      <ion-card class="section-card">
+        <ion-card-header>
+          <div class="section-header" onclick={() => toggleSection("examples")}>
             <ion-card-title>
-              <ion-icon icon={gitNetworkOutline}></ion-icon>
-              Related Subsystems
+              <ion-icon icon={codeWorkingOutline}></ion-icon>
+              Usage Examples
             </ion-card-title>
-          </ion-card-header>
+            <ion-icon
+              icon={expandedSections.has("examples") ? chevronUp : chevronDown}
+            ></ion-icon>
+          </div>
+        </ion-card-header>
+
+        {#if expandedSections.has("examples")}
           <ion-card-content>
-            <div class="related-subsystems">
-              {#each relatedSubsystems as related}
-                <ion-chip
-                  class="related-chip"
-                  onclick={() => handleRelatedClick(related)}
-                >
-                  <ion-icon icon={layersOutline}></ion-icon>
-                  <ion-label>{related}</ion-label>
-                  <ion-icon icon={arrowForward}></ion-icon>
-                </ion-chip>
+            <div class="examples-list">
+              {#each usageExamples as example, index}
+                <div class="example-item">
+                  <div class="example-header">
+                    <h5>Example {index + 1}</h5>
+                    <ion-button
+                      size="small"
+                      fill="clear"
+                      onclick={() =>
+                        copyToClipboard(example, `example-${index}`)}
+                    >
+                      <ion-icon
+                        icon={copiedStates[`example-${index}`]
+                          ? checkmark
+                          : copy}
+                        slot="start"
+                      ></ion-icon>
+                      {copiedStates[`example-${index}`] ? "Copied!" : "Copy"}
+                    </ion-button>
+                  </div>
+                  <div class="example-code">
+                    <pre><code>{example}</code></pre>
+                  </div>
+                </div>
               {/each}
             </div>
           </ion-card-content>
-        </ion-card>
-      {/if}
-    </div>
+        {/if}
+      </ion-card>
+    {/if}
+
+    <!-- Related Subsystems -->
+    {#if relatedSubsystems.length > 0}
+      <ion-card class="section-card">
+        <ion-card-header>
+          <ion-card-title>
+            <ion-icon icon={gitNetworkOutline}></ion-icon>
+            Related Subsystems
+          </ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <div class="related-subsystems">
+            {#each relatedSubsystems as related}
+              <ion-chip
+                class="related-chip"
+                onclick={() => handleRelatedClick(related)}
+              >
+                <ion-icon icon={layersOutline}></ion-icon>
+                <ion-label>{related}</ion-label>
+                <ion-icon icon={arrowForward}></ion-icon>
+              </ion-chip>
+            {/each}
+          </div>
+        </ion-card-content>
+      </ion-card>
+    {/if}
   {/if}
 </ion-content>
 
 <style lang="scss">
-  .subsystem-docs-container {
-    max-width: 1000px;
-    margin: 0 auto;
-    padding: 0 16px;
-  }
-
   .loading-container {
     display: flex;
     flex-direction: column;
@@ -855,7 +693,7 @@ Focus on architectural concepts and system design.`;
   .files-list {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 8px;
   }
 
   .file-item {
@@ -911,7 +749,8 @@ Focus on architectural concepts and system design.`;
 
   .expand-icon {
     color: var(--ion-color-medium);
-    font-size: 1rem;
+    font-size: 1.25rem;
+    padding-left: 0.25em;
   }
 
   .file-details {
@@ -1102,18 +941,8 @@ Focus on architectural concepts and system design.`;
 
   // Responsive Design
   @media (max-width: 768px) {
-    .subsystem-docs-container {
-      padding: 0 8px;
-    }
-
     .subsystem-title {
       font-size: 1.5rem;
-    }
-
-    .file-info {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 8px;
     }
 
     .interface-info {

@@ -5,7 +5,7 @@
   import { getRepoById } from "$lib/services/repository";
   import { makeOpenAIRequest } from "$services/ai-analyzer";
   import type { FirestoreRepo } from "$types/repository";
-  import type { AnalysisResult, Subsystem, Framework } from "$types/analysis";
+  import type { AnalysisResult, Subsystem, SubsystemReference, Framework } from "$types/analysis";
   import GraphLoadingState from '$components/graph/LoadingState.svelte';
   import GraphErrorCard from '$components/graph/ErrorCard.svelte';
   import GraphControls from '$components/graph/Controls.svelte';
@@ -162,7 +162,7 @@
 
   // Framework-specific relationship generation
   function generateFrameworkRelationships(
-    subsystems: Subsystem[],
+    subsystems: SubsystemReference[],
     framework: Framework
   ): string {
     let relationships = "";
@@ -221,7 +221,7 @@
 
   // Helper functions to categorize subsystems
   function isEntryPointSubsystem(
-    subsystem: Subsystem,
+    subsystem: SubsystemReference,
     framework: Framework
   ): boolean {
     const name = subsystem.name.toLowerCase();
@@ -232,13 +232,13 @@
     );
   }
 
-  function isUISubsystem(subsystem: Subsystem, framework: Framework): boolean {
+  function isUISubsystem(subsystem: SubsystemReference, framework: Framework): boolean {
     const name = subsystem.name.toLowerCase();
     return name.includes("components") || name.includes("ui");
   }
 
   function isServiceSubsystem(
-    subsystem: Subsystem,
+    subsystem: SubsystemReference,
     framework: Framework
   ): boolean {
     const name = subsystem.name.toLowerCase();
@@ -319,7 +319,10 @@
       const prompt = `Analyze the architecture of this ${analysis.framework} repository called "${repo.fullName}":
 
 Subsystems:
-${analysis.subsystems.map((s) => `- ${s.name}: ${s.files.length} files`).join("\n")}
+${analysis.subsystems.map((s) => {
+  const fileCount = Array.isArray(s.files) ? s.files.length : 0;
+  return `- ${s.name}: ${fileCount} files`;
+}).join("\n")}
 
 Framework: ${analysis.framework}
 Total Files: ${analysis.fileCount}
@@ -354,7 +357,10 @@ Keep it practical and focused on helping developers understand the codebase stru
 
     return `This ${analysis.framework} repository is organized into ${analysis.subsystems.length} main subsystems:
 
-${analysis.subsystems.map((s) => `**${s.name}**: Contains ${s.files.length} files focused on ${s.description.toLowerCase()}`).join("\n\n")}
+${analysis.subsystems.map((s) => {
+  const fileCount = Array.isArray(s.files) ? s.files.length : 0;
+  return `**${s.name}**: Contains ${fileCount} files focused on ${s.description.toLowerCase()}`;
+}).join("\n\n")}
 
 The architecture follows common ${analysis.framework} patterns with clear separation of concerns. Each subsystem has a specific responsibility, making the codebase maintainable and scalable.`;
   }

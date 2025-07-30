@@ -69,21 +69,29 @@ export interface OpenAIResponse {
 // Analysis result interface
 export interface AnalysisResult {
   metadata: RepoData;
-  fileTree: GitHubFile[];
+  fileTree: Record<string, GitHubFile>; // Object with file path as key
   version: RepoVersion;
   analyzedAt: string;
   fileCount: number;
   languages: Record<string, number>;
   framework: Framework;
-  subsystems: Subsystem[];
-  mainFiles: GitHubFile[];
-  configFiles: GitHubFile[];
-  documentationFiles: GitHubFile[];
-  testFiles: GitHubFile[];
+  subsystems: SubsystemReference[];
+  mainFiles: string[]; // Array of file path keys
+  configFiles: string[]; // Array of file path keys
+  documentationFiles: string[]; // Array of file path keys
+  testFiles: string[]; // Array of file path keys
   // Enhanced documentation fields
   subsystemDescriptions?: SubsystemDescription[];
   keyInterfaces?: FileInterface[];
   citations?: CitationLink[];
+}
+
+// Updated subsystem interface to reference files by key
+export interface SubsystemReference {
+  name: string;
+  description: string;
+  files: string[]; // Array of file path keys instead of full file objects
+  pattern: string;
 }
 
 export interface AnalysisSession {

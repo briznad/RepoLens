@@ -18,7 +18,7 @@ function createSystemPrompt(repositoryData: FirestoreRepo, analysisData: Analysi
 
     return `- **${subsystem?.name || `Subsystem ${index + 1}`}**: ${description?.description || subsystem?.description || 'No description available'} (${subsystem?.files?.length || 0} files)
   Entry points: ${description?.entryPoints?.join(', ') || 'N/A'}
-  Key files: ${description?.keyFiles?.slice(0, 3).join(', ') || subsystem?.files?.slice(0, 3).map(f => f?.path?.split('/').pop()).join(', ') || 'N/A'}`;
+  Key files: ${description?.keyFiles?.slice(0, 3).join(', ') || subsystem?.files?.slice(0, 3).map(f => f?.split('/').pop()).join(', ') || 'N/A'}`;
   }).join('\n');
 
   // Create key interfaces summary
@@ -27,7 +27,7 @@ function createSystemPrompt(repositoryData: FirestoreRepo, analysisData: Analysi
   ).join('\n');
 
   // Create main files summary
-  const mainFilesSummary = mainFiles.map(file => `- ${file?.path || 'unknown'}`).join('\n');
+  const mainFilesSummary = mainFiles.map(filePath => `- ${filePath || 'unknown'}`).join('\n');
 
   return `You are Iris, a documentation assistant for the ${repoName} repository. Your primary role is to help users navigate and understand the repository's documentation.
 

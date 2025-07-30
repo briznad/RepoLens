@@ -4,6 +4,12 @@
     hourglassOutline,
     timeOutline,
     checkmarkCircleOutline,
+    codeOutline,
+    documentTextOutline,
+    starOutline,
+    gitBranchOutline,
+    syncOutline,
+    warningOutline,
   } from "ionicons/icons";
   import type { FirestoreRepo, AnalysisStatus } from "$types/repository";
   import type { AnalysisResult } from "$types/analysis";
@@ -49,134 +55,100 @@
   };
 </script>
 
-<div class="repo-info-section">
-  <div class="repo-header">
-    <div class="repo-title">
-      <h3>{repo.name}</h3>
-      <ion-button fill="clear" size="small" href={repo.url} target="_blank">
-        <ion-icon icon={logoGithub} slot="icon-only"></ion-icon>
-      </ion-button>
-    </div>
-    <div class="repo-meta">
-      <ion-chip color={getFrameworkColor(analysis.framework)} size="small">
+<header>
+  <h1>{repo.fullName}</h1>
+
+  {#if repo.description}
+    <p class="description">{repo.description}</p>
+  {/if}
+
+  <div class="meta">
+    {#if analysis?.framework}
+      <ion-chip color={getFrameworkColor(analysis.framework)}>
+        <ion-icon icon={codeOutline}></ion-icon>
         <ion-label>{analysis.framework}</ion-label>
       </ion-chip>
-      <div class="analysis-status">
-        {#if repo.analysisStatus === "analyzing"}
-          <ion-chip color="warning" size="small">
-            <ion-icon icon={hourglassOutline}></ion-icon>
-            <ion-label>Analyzing...</ion-label>
-          </ion-chip>
-        {:else if analysisStale}
-          <ion-chip color="medium" size="small">
-            <ion-icon icon={timeOutline}></ion-icon>
-            <ion-label>Stale</ion-label>
-          </ion-chip>
-        {:else}
-          <ion-chip color="success" size="small">
-            <ion-icon icon={checkmarkCircleOutline}></ion-icon>
-            <ion-label>Fresh</ion-label>
-          </ion-chip>
-        {/if}
-      </div>
-    </div>
-    <div class="repo-stats">
-      <span class="stat">{analysis.fileCount} files</span>
-      <span class="stat">{analysis.subsystems.length} subsystems</span>
-    </div>
-    <div class="timestamp-info">
-      <div class="timestamp">
-        <span class="label">Analyzed:</span>
-        <span class="value">{analysisAge()}</span>
-      </div>
-      <div class="timestamp">
-        <span class="label">Updated:</span>
-        <span class="value"
-          >{formatTimestamp(repo.githubPushedAt).split(",")[0]}</span
-        >
-      </div>
-    </div>
+    {:else if repo.language}
+      <ion-chip color="medium">
+        <ion-label>{repo.language}</ion-label>
+      </ion-chip>
+    {/if}
+
+    <ion-chip color="medium">
+      <ion-icon icon={starOutline}></ion-icon>
+      <ion-label>{repo.stars}</ion-label>
+    </ion-chip>
+
+    <ion-chip color="medium">
+      <ion-icon icon={gitBranchOutline}></ion-icon>
+      <ion-label>{repo.forks}</ion-label>
+    </ion-chip>
   </div>
-</div>
+
+  <ion-button color="dark" fill="outline" href={repo.url} target="_blank">
+    <ion-icon icon={logoGithub} slot="start"></ion-icon>
+    View on GitHub
+  </ion-button>
+
+  <div class="key-value">
+    <span class="key">Total Files:</span>
+    <span class="value">{analysis.fileCount}</span>
+  </div>
+
+  <div class="key-value">
+    <span class="key">Subsystems:</span>
+    <span class="value">{analysis.subsystems.length}</span>
+  </div>
+
+  <div class="key-value">
+    <span class="key">Last Updated:</span>
+    <span class="value"
+      >{formatTimestamp(repo.githubPushedAt).split(",")[0]}</span
+    >
+  </div>
+
+  <div class="key-value">
+    <span class="key">Last Analyzed:</span>
+    <span class="value">{analysisAge()}</span>
+  </div>
+
+  {#if repo.analysisStatus === "analyzing"}
+    <ion-chip color="primary" size="small">
+      <ion-icon icon={syncOutline}></ion-icon>
+      <ion-label>Analysis in progress</ion-label>
+    </ion-chip>
+  {:else if analysisStale}
+    <ion-chip color="warning" size="small">
+      <ion-icon icon={warningOutline}></ion-icon>
+      <ion-label>Analysis may be outdated</ion-label>
+    </ion-chip>
+  {/if}
+</header>
 
 <style lang="scss">
-  .repo-info-section {
+  header {
     padding: 16px;
     border-bottom: 2px solid var(--ion-color-light);
-    margin-bottom: 16px;
-    background: var(--ion-color-light-tint);
   }
 
-  .repo-header {
-    .repo-title {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 12px;
+  .meta,
+  ion-button {
+    margin-bottom: 12px;
+  }
 
-      h3 {
-        font-size: 1.2rem;
-        font-weight: 600;
-        color: var(--ion-color-dark);
-        margin: 0;
-        flex: 1;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-      }
+  .key-value {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+    font-size: 0.8rem;
 
-      ion-button {
-        --color: var(--ion-color-medium);
-        margin-left: 8px;
-
-        &:hover {
-          --color: var(--ion-color-primary);
-        }
-      }
+    .key {
+      color: var(--ion-color-medium);
     }
 
-    .repo-meta {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 12px;
-      flex-wrap: wrap;
-    }
-
-    .analysis-status {
-      display: flex;
-      align-items: center;
-    }
-
-    .repo-stats {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 12px;
-      font-size: 0.9rem;
-
-      .stat {
-        color: var(--ion-color-medium);
-        font-weight: 500;
-      }
-    }
-
-    .timestamp-info {
-      font-size: 0.8rem;
-
-      .timestamp {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 4px;
-
-        .label {
-          color: var(--ion-color-medium);
-        }
-
-        .value {
-          color: var(--ion-color-dark);
-          font-weight: 500;
-        }
-      }
+    .value {
+      color: var(--ion-color-dark);
+      font-weight: 500;
     }
   }
 </style>

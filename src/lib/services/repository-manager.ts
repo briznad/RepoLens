@@ -1,8 +1,8 @@
 import type { FirestoreRepo, RepoData } from '$types/repository';
 import type { AnalysisResult, Subsystem, SubsystemDescription } from '$types/analysis';
-import { repositoryStore } from '$stores/repository';
-import { documentationStore } from '$stores/documentation';
-import { navigationStore } from '$stores/navigation';
+import { repositoryStore } from '$stores/repository.svelte';
+import { documentationStore } from '$stores/documentation.svelte';
+import { navigationStore } from '$stores/navigation.svelte';
 import { persistence } from './persistence';
 import { cache } from './cache';
 import { validateRepo } from '$utilities/validation';
@@ -49,10 +49,14 @@ export class RepositoryManager {
         const aiDescription = analysisData.subsystemDescriptions?.find(
           desc => desc.name === subsystem.name
         );
+        // Convert SubsystemReference back to Subsystem format with file objects
+        const subsystemFiles = subsystem.files.map(filePath => analysisData.fileTree[filePath]).filter(Boolean);
         return { 
-          ...subsystem,
-          description: aiDescription
-        } as Subsystem & { description?: SubsystemDescription };
+          name: subsystem.name,
+          description: aiDescription?.description || subsystem.description,
+          files: subsystemFiles,
+          pattern: subsystem.pattern
+        } as Subsystem;
       });
 
       documentationStore.setSubsystems(subsystems);

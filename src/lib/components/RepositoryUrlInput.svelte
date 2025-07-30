@@ -1,10 +1,9 @@
 <script lang="ts">
-  import { searchOutline } from 'ionicons/icons';
+  import { searchOutline } from "ionicons/icons";
 
   interface Props {
     title?: string;
     subtitle?: string;
-    placeholder?: string;
     buttonText?: string;
     repoUrl: string;
     isLoading: boolean;
@@ -13,16 +12,15 @@
     onUrlChange: (url: string) => void;
   }
 
-  let { 
+  let {
     title = "Analyze a Public Repository",
     subtitle = "Enter any public GitHub repository URL to get started",
-    placeholder = "https://github.com/owner/repo",
     buttonText = "Analyze Repository",
     repoUrl,
     isLoading,
     error,
     onSubmit,
-    onUrlChange
+    onUrlChange,
   }: Props = $props();
 
   function handleSubmit(e: Event) {
@@ -47,7 +45,7 @@
         <ion-input
           label="Public GitHub Repository URL"
           label-placement="stacked"
-          placeholder={placeholder}
+          placeholder="https://github.com/owner/repo"
           value={repoUrl}
           onionInput={handleInput}
           required

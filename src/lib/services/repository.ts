@@ -276,7 +276,7 @@ export async function findOrCreateRepo(url: string): Promise<string> {
 
     const analysisResult: AnalysisResult = {
       metadata: githubData,
-      fileTree: [],
+      fileTree: {},
       version: {
         pushedAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -313,9 +313,9 @@ export async function findOrCreateRepo(url: string): Promise<string> {
 /**
  * Check if repository needs fresh analysis by comparing GitHub vs Firestore versions
  */
-export async function checkRepoFreshness(url: string, githubRepoData: RepoData): Promise<boolean> {
+export async function checkRepoFreshness(repoId: string, githubRepoData: RepoData): Promise<boolean> {
   try {
-    const existingRepo = await checkRepositoryByUrl(url);
+    const existingRepo = await getRepoById(repoId);
 
     if (!existingRepo) {
       return false; // Repo doesn't exist, needs fresh analysis
@@ -344,17 +344,20 @@ export async function updateRepoWithAnalysis(
   analysisData: AnalysisResult
 ): Promise<void> {
   try {
-    // Extract owner and repo from GitHub data
-    const { owner, repo } = parseGitHubUrl(githubData.html_url);
+    // Update the existing repository document
+    const updates: Partial<StoredRepositoryFirestore> = {
+      fullName: githubData.full_name,
+      description: githubData.description || null,
+      language: githubData.language || null,
+      stars: githubData.stargazers_count,
+      forks: githubData.forks_count,
+      lastAnalyzed: FirestoreTimestamp.now(),
+      analysisVersion: '1.0.0',
+      data: analysisData,
+      status: 'completed'
+    };
 
-    // Store the updated repository data
-    await storeRepository(
-      owner,
-      repo,
-      githubData,
-      analysisData,
-      'completed'
-    );
+    await firestore.update(REPOSITORIES_COLLECTION, repoId, updates);
 
   } catch (error) {
     console.error('Error updating repository with analysis:', error);

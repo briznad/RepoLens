@@ -2,6 +2,7 @@ import type { RepoData, GitHubFile, RepoVersion } from '$types/repository';
 import type {
   Framework,
   Subsystem,
+  SubsystemReference,
   SubsystemPattern,
   AnalysisResult,
   FileInterface,
@@ -37,9 +38,21 @@ export function detectFramework(repoData: RepoData, files: GitHubFile[]): Framew
     }
   }
 
-  // Check for Svelte
-  if (filePaths.some(path => path.endsWith('.svelte')) ||
-      filePaths.some(path => path.includes('svelte.config.js') || path.includes('svelte.config.ts'))) {
+  // Check for Svelte/SvelteKit
+  if (filePaths.some(path => path.includes('svelte.config.js') || 
+                            path.includes('svelte.config.ts') ||
+                            path.includes('svelte.config.mjs'))) {
+    return 'svelte';
+  }
+  
+  // Also check for .svelte files and src/routes structure (SvelteKit pattern)
+  if (filePaths.some(path => path.endsWith('.svelte')) &&
+      filePaths.some(path => path.startsWith('src/routes/'))) {
+    return 'svelte';
+  }
+  
+  // Just having .svelte files also indicates Svelte
+  if (filePaths.some(path => path.endsWith('.svelte'))) {
     return 'svelte';
   }
 
@@ -110,6 +123,20 @@ const FRAMEWORK_PATTERNS: Record<Framework, SubsystemPattern[]> = {
       patterns: ['src/context/', 'context/', 'src/store/', 'store/', 'src/state/', 'state/'],
       extensions: ['.js', '.ts', '.jsx', '.tsx'],
       priority: 6
+    },
+    {
+      name: 'Configuration',
+      description: 'Configuration files and settings',
+      patterns: ['config/', 'src/config/', '.github/', '.vscode/', 'public/'],
+      extensions: ['.js', '.ts', '.json', '.yaml', '.yml', '.toml', '.env', '.md'],
+      priority: 7
+    },
+    {
+      name: 'Documentation',
+      description: 'Project documentation and guides',
+      patterns: ['docs/', 'documentation/', 'README', 'CHANGELOG', 'CONTRIBUTING'],
+      extensions: ['.md', '.mdx', '.txt', '.rst'],
+      priority: 8
     }
   ],
   nextjs: [
@@ -154,6 +181,20 @@ const FRAMEWORK_PATTERNS: Record<Framework, SubsystemPattern[]> = {
       patterns: ['src/utils/', 'utils/', 'src/lib/', 'lib/', 'src/helpers/', 'helpers/'],
       extensions: ['.js', '.ts'],
       priority: 6
+    },
+    {
+      name: 'Configuration',
+      description: 'Configuration files and settings',
+      patterns: ['config/', 'src/config/', '.github/', '.vscode/', 'public/'],
+      extensions: ['.js', '.ts', '.json', '.yaml', '.yml', '.toml', '.env', '.md'],
+      priority: 7
+    },
+    {
+      name: 'Documentation',
+      description: 'Project documentation and guides',
+      patterns: ['docs/', 'documentation/', 'README', 'CHANGELOG', 'CONTRIBUTING'],
+      extensions: ['.md', '.mdx', '.txt', '.rst'],
+      priority: 8
     }
   ],
   svelte: [
@@ -161,13 +202,13 @@ const FRAMEWORK_PATTERNS: Record<Framework, SubsystemPattern[]> = {
       name: 'Routes',
       description: 'SvelteKit routes and pages',
       patterns: ['src/routes/', 'routes/'],
-      extensions: ['.svelte', '.js', '.ts'],
+      extensions: ['.svelte', '.js', '.ts', '.server.js', '.server.ts'],
       priority: 1
     },
     {
       name: 'Components',
       description: 'Svelte components',
-      patterns: ['src/lib/components/', 'src/components/', 'components/', 'src/lib/'],
+      patterns: ['src/lib/components/', 'src/components/', 'components/'],
       extensions: ['.svelte'],
       priority: 2
     },
@@ -179,18 +220,46 @@ const FRAMEWORK_PATTERNS: Record<Framework, SubsystemPattern[]> = {
       priority: 3
     },
     {
-      name: 'Actions',
-      description: 'Form actions and server-side logic',
-      patterns: ['src/lib/actions/', 'src/actions/', 'actions/'],
+      name: 'Server',
+      description: 'Server-side logic and utilities',
+      patterns: ['src/lib/server/', 'src/server/'],
       extensions: ['.js', '.ts'],
       priority: 4
+    },
+    {
+      name: 'Services',
+      description: 'External services and integrations',
+      patterns: ['src/lib/firebase/', 'src/lib/services/', 'src/services/'],
+      extensions: ['.js', '.ts'],
+      priority: 5
+    },
+    {
+      name: 'Models',
+      description: 'Data models and types',
+      patterns: ['src/lib/models/', 'src/models/'],
+      extensions: ['.js', '.ts'],
+      priority: 6
     },
     {
       name: 'Utils',
       description: 'Utility functions and helpers',
       patterns: ['src/lib/utils/', 'src/utils/', 'utils/', 'src/lib/'],
       extensions: ['.js', '.ts'],
-      priority: 5
+      priority: 7
+    },
+    {
+      name: 'Configuration',
+      description: 'Configuration files and settings',
+      patterns: ['config/', 'src/config/', '.github/', '.vscode/', 'static/', 'public/'],
+      extensions: ['.js', '.ts', '.json', '.yaml', '.yml', '.toml', '.env', '.md'],
+      priority: 8
+    },
+    {
+      name: 'Documentation',
+      description: 'Project documentation and guides',
+      patterns: ['docs/', 'documentation/', 'README', 'CHANGELOG', 'CONTRIBUTING'],
+      extensions: ['.md', '.mdx', '.txt', '.rst'],
+      priority: 9
     }
   ],
   flask: [
@@ -223,10 +292,10 @@ const FRAMEWORK_PATTERNS: Record<Framework, SubsystemPattern[]> = {
       priority: 4
     },
     {
-      name: 'Config',
-      description: 'Configuration files',
-      patterns: ['config/', 'app/config/', 'src/config/'],
-      extensions: ['.py', '.json', '.yaml', '.yml'],
+      name: 'Configuration',
+      description: 'Configuration files and settings',
+      patterns: ['config/', 'app/config/', 'src/config/', '.github/', 'instance/', 'migrations/'],
+      extensions: ['.py', '.json', '.yaml', '.yml', '.toml', '.env', '.cfg', '.ini'],
       priority: 5
     },
     {
@@ -235,6 +304,13 @@ const FRAMEWORK_PATTERNS: Record<Framework, SubsystemPattern[]> = {
       patterns: ['auth/', 'app/auth/', 'src/auth/'],
       extensions: ['.py'],
       priority: 6
+    },
+    {
+      name: 'Documentation',
+      description: 'Project documentation and guides',
+      patterns: ['docs/', 'documentation/', 'README', 'CHANGELOG', 'CONTRIBUTING'],
+      extensions: ['.md', '.rst', '.txt'],
+      priority: 7
     }
   ],
   fastapi: [
@@ -267,10 +343,10 @@ const FRAMEWORK_PATTERNS: Record<Framework, SubsystemPattern[]> = {
       priority: 4
     },
     {
-      name: 'Config',
-      description: 'Configuration files',
-      patterns: ['config/', 'app/config/', 'src/config/'],
-      extensions: ['.py', '.json', '.yaml', '.yml'],
+      name: 'Configuration',
+      description: 'Configuration files and settings',
+      patterns: ['config/', 'app/config/', 'src/config/', '.github/', 'docker/', 'deployment/'],
+      extensions: ['.py', '.json', '.yaml', '.yml', '.toml', '.env', '.cfg', '.ini'],
       priority: 5
     },
     {
@@ -279,6 +355,13 @@ const FRAMEWORK_PATTERNS: Record<Framework, SubsystemPattern[]> = {
       patterns: ['auth/', 'app/auth/', 'src/auth/'],
       extensions: ['.py'],
       priority: 6
+    },
+    {
+      name: 'Documentation',
+      description: 'Project documentation and guides',
+      patterns: ['docs/', 'documentation/', 'README', 'CHANGELOG', 'CONTRIBUTING'],
+      extensions: ['.md', '.rst', '.txt'],
+      priority: 7
     }
   ],
   unknown: []
@@ -303,9 +386,13 @@ export function categorizeFiles(files: GitHubFile[], framework: Framework): Subs
       }
 
       // Check if file matches any of the path patterns
-      const pathMatches = pattern.patterns.some(p =>
-        file.path.toLowerCase().includes(p.toLowerCase())
-      );
+      const pathMatches = pattern.patterns.some(p => {
+        const normalizedPath = file.path.toLowerCase();
+        const normalizedPattern = p.toLowerCase();
+        // Match if the file path starts with or contains the pattern
+        return normalizedPath.startsWith(normalizedPattern) || 
+               normalizedPath.includes('/' + normalizedPattern);
+      });
 
       // Check if file has matching extension (if specified)
       const extensionMatches = !pattern.extensions ||
@@ -351,8 +438,20 @@ export function analyzeRepo(repoData: RepoData, files: GitHubFile[]): AnalysisRe
   // Detect framework
   const framework = detectFramework(repoData, files);
 
-  // Categorize files into subsystems
-  const subsystems = categorizeFiles(files, framework);
+  // Create fileTree object with path as key
+  const fileTree: Record<string, GitHubFile> = {};
+  files.forEach(file => {
+    fileTree[file.path] = file;
+  });
+
+  // Categorize files into subsystems (returns Subsystem[], we'll convert to SubsystemReference[])
+  const subsystemsOld = categorizeFiles(files, framework);
+  const subsystems = subsystemsOld.map(subsystem => ({
+    name: subsystem.name,
+    description: subsystem.description,
+    files: subsystem.files.map(file => file.path), // Convert to array of keys
+    pattern: subsystem.pattern
+  }));
 
   // Calculate language distribution
   const languages: Record<string, number> = {};
@@ -383,27 +482,35 @@ export function analyzeRepo(repoData: RepoData, files: GitHubFile[]): AnalysisRe
     }
   });
 
-  // Categorize special files
-  const mainFiles = files.filter(file =>
-    ['readme.md', 'index.js', 'index.ts', 'main.py', 'app.py', 'index.html', 'package.json'].includes(file.path.toLowerCase())
-  );
+  // Categorize special files - return array of file paths instead of file objects
+  const mainFiles = files
+    .filter(file =>
+      ['readme.md', 'index.js', 'index.ts', 'main.py', 'app.py', 'index.html', 'package.json'].includes(file.path.toLowerCase())
+    )
+    .map(file => file.path);
 
-  const configFiles = files.filter(file => {
-    const path = file.path.toLowerCase();
-    return path.includes('config') || path.endsWith('.config.js') || path.endsWith('.config.ts') ||
-           path.includes('package.json') || path.includes('requirements.txt') ||
-           path.includes('pyproject.toml') || path.includes('.env') || path.includes('dockerfile');
-  });
+  const configFiles = files
+    .filter(file => {
+      const path = file.path.toLowerCase();
+      return path.includes('config') || path.endsWith('.config.js') || path.endsWith('.config.ts') ||
+             path.includes('package.json') || path.includes('requirements.txt') ||
+             path.includes('pyproject.toml') || path.includes('.env') || path.includes('dockerfile');
+    })
+    .map(file => file.path);
 
-  const documentationFiles = files.filter(file => {
-    const path = file.path.toLowerCase();
-    return path.endsWith('.md') || path.includes('docs/') || path.includes('documentation/');
-  });
+  const documentationFiles = files
+    .filter(file => {
+      const path = file.path.toLowerCase();
+      return path.endsWith('.md') || path.includes('docs/') || path.includes('documentation/');
+    })
+    .map(file => file.path);
 
-  const testFiles = files.filter(file => {
-    const path = file.path.toLowerCase();
-    return path.includes('test') || path.includes('spec') || path.includes('__tests__/');
-  });
+  const testFiles = files
+    .filter(file => {
+      const path = file.path.toLowerCase();
+      return path.includes('test') || path.includes('spec') || path.includes('__tests__/');
+    })
+    .map(file => file.path);
 
   // Create version info
   const version: RepoVersion = {
@@ -415,7 +522,7 @@ export function analyzeRepo(repoData: RepoData, files: GitHubFile[]): AnalysisRe
 
   return {
     metadata: repoData,
-    fileTree: files,
+    fileTree,
     version,
     analyzedAt: new Date().toISOString(),
     fileCount: files.filter(f => f.type === 'blob').length,
@@ -427,6 +534,20 @@ export function analyzeRepo(repoData: RepoData, files: GitHubFile[]): AnalysisRe
     documentationFiles,
     testFiles
   };
+}
+
+/**
+ * Helper function to get files from subsystem using fileTree object
+ */
+export function getSubsystemFiles(subsystem: SubsystemReference, fileTree: Record<string, GitHubFile>): GitHubFile[] {
+  return subsystem.files.map(filePath => fileTree[filePath]).filter(Boolean);
+}
+
+/**
+ * Helper function to get files by paths from fileTree object
+ */
+export function getFilesByPaths(filePaths: string[], fileTree: Record<string, GitHubFile>): GitHubFile[] {
+  return filePaths.map(filePath => fileTree[filePath]).filter(Boolean);
 }
 
 /**

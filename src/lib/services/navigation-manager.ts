@@ -1,5 +1,5 @@
 import type { NavigationState } from '$types/stores';
-import { navigationStore } from '$stores/navigation';
+import { navigationStore } from '$stores/navigation.svelte';
 import { persistence } from './persistence';
 
 /**
@@ -15,7 +15,7 @@ export class NavigationManager {
     navigationStore.setCurrentPage(page);
     navigationStore.addToRouteHistory(page);
     navigationStore.limitRouteHistory(20);
-    
+
     persistence.save('navigationState', navigationStore.value);
   }
 
@@ -24,7 +24,7 @@ export class NavigationManager {
    */
   setRepositoryContext(repoId: string | null, repoName: string | null): void {
     navigationStore.setRepoContext(repoId, repoName);
-    
+
     // Auto-generate breadcrumbs for repository context
     if (repoId && repoName) {
       this.updateBreadcrumbs([
@@ -34,7 +34,7 @@ export class NavigationManager {
     } else {
       this.updateBreadcrumbs([]);
     }
-    
+
     persistence.save('navigationState', navigationStore.value);
   }
 
@@ -43,7 +43,7 @@ export class NavigationManager {
    */
   setCurrentSubsystem(subsystemName: string | null): void {
     navigationStore.setCurrentSubsystem(subsystemName);
-    
+
     // Update breadcrumbs to include subsystem
     const repoContext = navigationStore.value.repoContext;
     if (subsystemName && repoContext.repoId && repoContext.repoName) {
@@ -212,12 +212,12 @@ export class NavigationManager {
     };
 
     const persistedState = persistence.load('navigationState', defaultState);
-    
+
     // Restore critical navigation state
     if (persistedState.currentPage) {
       navigationStore.setCurrentPage(persistedState.currentPage);
     }
-    
+
     if (persistedState.repoContext) {
       navigationStore.setRepoContext(
         persistedState.repoContext.repoId,
@@ -227,21 +227,21 @@ export class NavigationManager {
         navigationStore.setCurrentSubsystem(persistedState.repoContext.currentSubsystem);
       }
     }
-    
+
     if (persistedState.breadcrumbs) {
       navigationStore.setBreadcrumbs(persistedState.breadcrumbs);
     }
-    
+
     if (typeof persistedState.sidebarOpen === 'boolean') {
       navigationStore.setSidebarOpen(persistedState.sidebarOpen);
     }
-    
+
     if (persistedState.scrollPositions instanceof Map) {
       for (const [path, position] of persistedState.scrollPositions) {
         navigationStore.saveScrollPosition(path, position);
       }
     }
-    
+
     if (Array.isArray(persistedState.routeHistory)) {
       for (const route of persistedState.routeHistory) {
         navigationStore.addToRouteHistory(route);

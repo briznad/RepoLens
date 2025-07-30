@@ -1,6 +1,12 @@
 <script lang="ts">
-  import { informationCircleOutline, arrowForwardCircleOutline, openOutline } from 'ionicons/icons';
-  import type { SubsystemDescription } from '$types/analysis';
+  import {
+    informationCircleOutline,
+    arrowForwardCircleOutline,
+    openOutline,
+    chevronUp,
+    chevronDown,
+  } from "ionicons/icons";
+  import type { SubsystemDescription } from "$types/analysis";
 
   interface Props {
     title?: string;
@@ -11,13 +17,13 @@
     onCreateGitHubLink: (filePath: string) => string;
   }
 
-  let { 
+  let {
     title = "Overview & Architecture Role",
     subsystemDescription,
     architectureRole,
     expanded,
     onToggle,
-    onCreateGitHubLink
+    onCreateGitHubLink,
   }: Props = $props();
 </script>
 
@@ -28,7 +34,8 @@
         <ion-icon icon={informationCircleOutline}></ion-icon>
         {title}
       </ion-card-title>
-      <ion-icon name={expanded ? "chevron-up" : "chevron-down"}></ion-icon>
+
+      <ion-icon icon={expanded ? chevronUp : chevronDown}></ion-icon>
     </div>
   </ion-card-header>
 

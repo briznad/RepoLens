@@ -69,6 +69,8 @@ export interface GitHubFile {
   sha: string;
   size?: number;
   url: string;
+  explanation?: string; // AI-generated explanation of the file's purpose
+  generatedAt?: string; // When explanation was generated
 }
 
 export interface GitHubFileContent {

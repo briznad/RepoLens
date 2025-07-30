@@ -1,7 +1,7 @@
 import type { SearchResult, SubsystemDescription } from '$types/analysis';
-import { documentationStore } from '$stores/documentation';
-import { navigationStore } from '$stores/navigation';
-import { preferencesStore } from '$stores/preferences';
+import { documentationStore } from '$stores/documentation.svelte';
+import { navigationStore } from '$stores/navigation.svelte';
+import { preferencesStore } from '$stores/preferences.svelte';
 import { persistence } from './persistence';
 import { cache } from './cache';
 
@@ -17,7 +17,7 @@ export class DocumentationManager {
   setCurrentSubsystem(subsystemName: string | null): void {
     documentationStore.setCurrentSubsystem(subsystemName);
     navigationStore.setCurrentSubsystem(subsystemName);
-    
+
     if (subsystemName) {
       this.addToRecentlyViewed(subsystemName);
     }
@@ -29,20 +29,20 @@ export class DocumentationManager {
   addToRecentlyViewed(subsystemName: string): void {
     const repoContext = navigationStore.value.repoContext;
     if (!repoContext.repoId || !repoContext.repoName) return;
-    
+
     const item = {
       subsystemName,
       timestamp: new Date().toISOString(),
       repoId: repoContext.repoId,
       repoName: repoContext.repoName
     };
-    
+
     documentationStore.addRecentlyViewed(item);
-    
+
     // Limit to preference setting
     const limit = preferencesStore.value.documentation.recentViewLimit;
     documentationStore.limitRecentlyViewed(limit);
-    
+
     persistence.save('documentationData', documentationStore.value);
   }
 
@@ -51,7 +51,7 @@ export class DocumentationManager {
    */
   updateSearchResults(query: string, results: SearchResult[]): void {
     documentationStore.setSearchResults(query, results);
-    
+
     // Add to recent searches if query is meaningful
     if (query.trim().length > 2) {
       this.addToRecentSearches(query, results.length);
@@ -81,12 +81,12 @@ export class DocumentationManager {
   cacheAIDescription(key: string, content: string, expirationHours: number = 24): void {
     const expiresAt = new Date(Date.now() + expirationHours * 60 * 60 * 1000).toISOString();
     const timestamp = new Date().toISOString();
-    
+
     documentationStore.cacheAIDescription(key, content, timestamp, expiresAt);
-    
+
     // Also cache in the cache service for cross-session persistence
     cache.cacheAIDescription(key, content, expirationHours);
-    
+
     persistence.save('documentationData', documentationStore.value);
   }
 
@@ -99,13 +99,13 @@ export class DocumentationManager {
       // Try cache service
       return cache.getAIDescription(key);
     }
-    
+
     // Check expiration
     if (new Date(cached.expiresAt) < new Date()) {
       documentationStore.removeExpiredAIDescription(key);
       return cache.getAIDescription(key); // Fallback to cache service
     }
-    
+
     return cached.content;
   }
 
@@ -182,30 +182,30 @@ export class DocumentationManager {
     };
 
     const persistedState = persistence.load('documentationData', defaultState);
-    
+
     // Restore state (stores will handle the reactive updates)
     if (persistedState.subsystems) {
       documentationStore.setSubsystems(persistedState.subsystems);
     }
-    
+
     if (persistedState.searchQuery || persistedState.searchResults) {
       documentationStore.setSearchResults(persistedState.searchQuery || '', persistedState.searchResults || []);
     }
-    
+
     if (persistedState.currentSubsystem) {
       documentationStore.setCurrentSubsystem(persistedState.currentSubsystem);
     }
-    
+
     if (persistedState.filterState) {
       documentationStore.setFilterState(persistedState.filterState);
     }
-    
+
     if (persistedState.recentlyViewed) {
       for (const item of persistedState.recentlyViewed) {
         documentationStore.addRecentlyViewed(item);
       }
     }
-    
+
     if (persistedState.aiDescriptions instanceof Map) {
       for (const [key, value] of persistedState.aiDescriptions) {
         documentationStore.cacheAIDescription(key, value.content, value.timestamp, value.expiresAt);

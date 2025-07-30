@@ -49,6 +49,7 @@ export function handleEnterKey(fn : ((event: Event, ...args: Array<unknown>) => 
 	};
 }
 
+// Alias for backward compatibility
 export const HEK = handleEnterKey;
 
 export function preventDefault(fn : ((event: Event, ...args: Array<unknown>) => void)) : (this: unknown, event: Event, ...args: unknown[]) => void {

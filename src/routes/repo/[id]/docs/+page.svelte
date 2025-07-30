@@ -1,9 +1,5 @@
 <script lang="ts">
-  import { page } from "$app/stores";
-  import { onMount } from "svelte";
   import { goto } from "$app/navigation";
-  import { repositoryManager } from "$services/repository-manager";
-  import { getRepoById } from "$lib/services/repository";
   import type { FirestoreRepo } from "$types/repository";
   import type {
     AnalysisResult,
@@ -11,67 +7,33 @@
     SubsystemDescription,
     Framework,
   } from "$types/analysis";
-  
-  import LoadingState from "$components/LoadingState.svelte";
-  import ErrorCard from "$components/ErrorCard.svelte";
-  import RepoHeader from "$components/repo/Header.svelte";
+
   import StatCard from "$components/StatCard.svelte";
   import LanguageDistribution from "$components/LanguageDistribution.svelte";
   import SearchAndFilter from "$components/SearchAndFilter.svelte";
   import SubsystemGrid from "$components/subsystem/Grid.svelte";
-  import FileList from "$components/FileList.svelte";
-  import { documentOutline, settingsOutline, documentTextOutline, informationCircleOutline, home } from 'ionicons/icons';
+  import SectionHeader from "$components/subsystem/SectionHeader.svelte";
+  import { layersOutline, analyticsOutline } from "ionicons/icons";
 
-  const repoId = $derived($page.params.id);
+  interface Props {
+    data: {
+      repo: FirestoreRepo;
+      analysis: AnalysisResult | null;
+      repoId: string;
+    };
+  }
 
-  // State management
-  let repo = $state<FirestoreRepo | null>(null);
-  let analysis = $state<AnalysisResult | null>(null);
-  let loading = $state(true);
-  let error = $state<string | null>(null);
+  let { data }: Props = $props();
+
+  const { repo, analysis, repoId } = data;
 
   // Search and filter state
   let searchQuery = $state("");
   let selectedFramework = $state<Framework | "all">("all");
   let sortBy = $state<"name" | "files" | "alphabetical">("name");
   let filteredSubsystems = $state<
-    (Subsystem & { description?: SubsystemDescription })[]
+    (Subsystem & { description: SubsystemDescription })[]
   >([]);
-
-  // Load repository data
-  onMount(async () => {
-    if (!repoId) {
-      error = "Repository ID not found";
-      loading = false;
-      return;
-    }
-
-    try {
-      const repoData = await getRepoById(repoId);
-      if (!repoData) {
-        error = "Repository not found";
-        loading = false;
-        return;
-      }
-
-      repo = repoData;
-      analysis = repoData.analysisData || null;
-
-      // Combine subsystems with their AI descriptions if available
-      if (analysis) {
-        filteredSubsystems = analysis.subsystems.map((subsystem) => {
-          const description = analysis?.subsystemDescriptions?.find(
-            (desc) => desc.name === subsystem.name
-          );
-          return { ...subsystem, description };
-        });
-      }
-    } catch (err) {
-      error = err instanceof Error ? err.message : "Failed to load repository";
-    } finally {
-      loading = false;
-    }
-  });
 
   // Filter and sort subsystems
   $effect(() => {
@@ -91,8 +53,8 @@
         (subsystem) =>
           subsystem.name.toLowerCase().includes(query) ||
           subsystem.description?.description?.toLowerCase().includes(query) ||
-          subsystem.files.some((file) =>
-            file.path.toLowerCase().includes(query)
+          subsystem.files.some((filePath) =>
+            filePath.toLowerCase().includes(query)
           )
       );
     }
@@ -142,132 +104,57 @@
   const handleSubsystemClick = (subsystemName: string) => {
     goto(`/repo/${repoId}/docs/${encodeURIComponent(subsystemName)}`);
   };
-
 </script>
 
 <ion-content class="ion-padding">
-  {#if loading}
-    <LoadingState message="Loading repository documentation..." />
-  {:else if error}
-    <ErrorCard 
-      title="Error" 
-      message={error} 
-      actions={[
-        {
-          label: "Return Home",
-          icon: home,
-          handler: () => goto("/"),
-          fill: "outline"
-        }
+  {#if repo && analysis}
+    <SectionHeader title="Repository Overview" icon={analyticsOutline} />
+
+    <StatCard
+      stats={[
+        { label: "Total Files", value: analysis.fileCount },
+        { label: "Subsystems", value: analysis.subsystems.length },
+        { label: "Languages", value: Object.keys(analysis.languages).length },
+        { label: "Total Size", value: formatFileSize(getTotalSize()) },
       ]}
     />
-  {:else if repo && analysis}
-    <div class="docs-container">
-      <!-- Header Section -->
-      <RepoHeader {repo} {analysis} />
 
-      <!-- Overview Section -->
-      <StatCard 
-        title="Repository Overview" 
-        stats={[
-          { label: "Total Files", value: analysis.fileCount },
-          { label: "Subsystems", value: analysis.subsystems.length },
-          { label: "Languages", value: Object.keys(analysis.languages).length },
-          { label: "Total Size", value: formatFileSize(getTotalSize()) }
-        ]}
-      />
-      
-      <!-- Language Distribution -->
-      {#if analysis.languages && Object.keys(analysis.languages).length > 0}
-        <ion-card>
-          <ion-card-content>
-            <LanguageDistribution languages={analysis.languages} />
-          </ion-card-content>
-        </ion-card>
-      {/if}
+    <!-- Language Distribution -->
+    {#if analysis.languages && Object.keys(analysis.languages).length > 0}
+      <LanguageDistribution languages={analysis.languages} />
+    {/if}
 
-      <!-- Search and Filter Section -->
-      <SearchAndFilter 
-        {searchQuery}
-        searchPlaceholder="Search subsystems, files, or descriptions..."
-        sortBy={sortBy}
-        sortOptions={[
-          { value: "name", label: "Default Order" },
-          { value: "alphabetical", label: "Alphabetical" },
-          { value: "files", label: "File Count" }
-        ]}
-        onSearchChange={(query) => searchQuery = query}
-        onSortChange={(sort) => sortBy = sort}
-      />
+    <!-- Search and Filter Section -->
+    <SearchAndFilter
+      {searchQuery}
+      searchPlaceholder="Search subsystems, files, or descriptions..."
+      {sortBy}
+      sortOptions={[
+        { value: "name", label: "Default Order" },
+        { value: "alphabetical", label: "Alphabetical" },
+        { value: "files", label: "File Count" },
+      ]}
+      onSearchChange={(query) => (searchQuery = query)}
+      onSortChange={(sort) => (sortBy = sort)}
+    />
 
-      <!-- Subsystems Grid -->
-      <SubsystemGrid 
-        subsystems={filteredSubsystems}
-        {searchQuery}
-        onSubsystemClick={handleSubsystemClick}
-        onClearSearch={() => searchQuery = ""}
-      />
+    <SectionHeader
+      title="Subsystems & Components"
+      icon={layersOutline}
+      subtitle="{filteredSubsystems.length} subsystem{filteredSubsystems.length !==
+      1
+        ? 's'
+        : ''} found"
+    />
 
-      <!-- Additional Information -->
-      <ion-card class="additional-info-card">
-        <ion-card-header>
-          <ion-card-title>
-            <ion-icon icon={informationCircleOutline}></ion-icon>
-            Additional Information
-          </ion-card-title>
-        </ion-card-header>
-        <ion-card-content>
-          <ion-grid>
-            <ion-row>
-              <ion-col size="12" size-md="4">
-                <FileList 
-                  files={analysis.mainFiles}
-                  title="Main Files"
-                  icon={documentOutline}
-                  emptyMessage="No main files detected"
-                />
-              </ion-col>
-              <ion-col size="12" size-md="4">
-                <FileList 
-                  files={analysis.configFiles}
-                  title="Configuration"
-                  icon={settingsOutline}
-                  emptyMessage="No config files detected"
-                />
-              </ion-col>
-              <ion-col size="12" size-md="4">
-                <FileList 
-                  files={analysis.documentationFiles}
-                  title="Documentation"
-                  icon={documentTextOutline}
-                  emptyMessage="No documentation files detected"
-                />
-              </ion-col>
-            </ion-row>
-          </ion-grid>
-        </ion-card-content>
-      </ion-card>
-    </div>
+    <!-- Subsystems Grid -->
+    <SubsystemGrid
+      subsystems={filteredSubsystems}
+      {searchQuery}
+      onSubsystemClick={handleSubsystemClick}
+      onClearSearch={() => (searchQuery = "")}
+    />
   {/if}
 </ion-content>
 
-<style lang="scss">
-  .docs-container {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 16px;
-  }
-
-
-  // Additional Information
-  .additional-info-card {
-    margin-bottom: 32px;
-  }
-
-  // Responsive adjustments
-  @media (max-width: 768px) {
-    .docs-container {
-      padding: 0 8px;
-    }
-  }
-</style>
+<style></style>
