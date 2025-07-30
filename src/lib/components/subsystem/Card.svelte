@@ -1,6 +1,6 @@
 <script lang="ts">
-  import type { Subsystem, SubsystemDescription } from '$types/analysis';
-  import { arrowForwardOutline } from 'ionicons/icons';
+  import type { Subsystem, SubsystemDescription } from "$types/analysis";
+  import { arrowForwardOutline } from "ionicons/icons";
 
   interface Props {
     subsystem: Subsystem & { description?: SubsystemDescription };
@@ -25,7 +25,7 @@
       </ion-chip>
     </div>
   </ion-card-header>
-  
+
   <ion-card-content>
     <div class="subsystem-content">
       <!-- AI-Generated Description -->
@@ -46,12 +46,14 @@
           <div class="file-chips">
             {#each subsystem.description.keyFiles.slice(0, 3) as keyFile}
               <ion-chip size="small" color="medium">
-                <ion-label>{keyFile.split('/').pop()}</ion-label>
+                <ion-label>{keyFile.split("/").pop()}</ion-label>
               </ion-chip>
             {/each}
             {#if subsystem.description.keyFiles.length > 3}
               <ion-chip size="small" color="light">
-                <ion-label>+{subsystem.description.keyFiles.length - 3} more</ion-label>
+                <ion-label
+                  >+{subsystem.description.keyFiles.length - 3} more</ion-label
+                >
               </ion-chip>
             {/if}
           </div>
@@ -63,7 +65,7 @@
           <div class="file-chips">
             {#each subsystem.files.slice(0, 3) as file}
               <ion-chip size="small" color="medium">
-                <ion-label>{file.path.split('/').pop()}</ion-label>
+                <ion-label>{file.path.split("/").pop()}</ion-label>
               </ion-chip>
             {/each}
             {#if subsystem.files.length > 3}
@@ -74,22 +76,8 @@
           </div>
         </div>
       {/if}
-
-      <!-- Technologies -->
-      {#if subsystem.description?.technologies && subsystem.description.technologies.length > 0}
-        <div class="technologies">
-          <h4>Technologies:</h4>
-          <div class="tech-chips">
-            {#each subsystem.description.technologies as tech}
-              <ion-chip size="small" color="tertiary">
-                <ion-label>{tech}</ion-label>
-              </ion-chip>
-            {/each}
-          </div>
-        </div>
-      {/if}
     </div>
-    
+
     <div class="subsystem-footer">
       <ion-button fill="clear" size="small" class="view-details-btn">
         <ion-label>View Details</ion-label>
@@ -102,9 +90,11 @@
 <style lang="scss">
   .subsystem-card {
     height: 100%;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    transition:
+      transform 0.2s ease,
+      box-shadow 0.2s ease;
     cursor: pointer;
-    
+
     &:hover {
       transform: translateY(-4px);
       box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
@@ -139,16 +129,16 @@
     line-height: 1.5;
     color: var(--ion-color-dark);
     margin: 0 0 16px 0;
-    
+
     &.fallback {
       color: var(--ion-color-medium);
       font-style: italic;
     }
   }
 
-  .key-files, .technologies {
+  .key-files {
     margin-bottom: 16px;
-    
+
     h4 {
       font-size: 0.9rem;
       font-weight: 600;
@@ -157,7 +147,7 @@
     }
   }
 
-  .file-chips, .tech-chips {
+  .file-chips {
     display: flex;
     flex-wrap: wrap;
     gap: 4px;
