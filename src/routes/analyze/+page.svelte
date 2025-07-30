@@ -71,7 +71,7 @@
       if (isFresh) {
         skipAnalysis = true;
 
-        updateProgress(5, "Repository is up to date!");
+        updateProgress(6, "Repository is up to date!");
 
         isComplete = true;
 
