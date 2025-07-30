@@ -30,7 +30,13 @@ function sanitizeForFirestore<T extends Record<string, any>>(data: T): T {
   for (const [key, value] of Object.entries(data)) {
     if (value === undefined) {
       (sanitized as any)[key] = null;
-    } else if (value !== null && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Date) && !(value instanceof FirestoreTimestamp)) {
+    } else if (Array.isArray(value)) {
+      // Recursively sanitize arrays
+      (sanitized as any)[key] = value.map(item => 
+        item && typeof item === 'object' ? sanitizeForFirestore(item) : 
+        item === undefined ? null : item
+      );
+    } else if (value !== null && typeof value === 'object' && !(value instanceof Date) && !(value instanceof FirestoreTimestamp)) {
       // Recursively sanitize nested objects
       (sanitized as any)[key] = sanitizeForFirestore(value);
     } else {
@@ -113,10 +119,11 @@ class Firestore {
 		const docRef = doc(this.db, collectionName, docId);
 
 		try {
-			await updateDoc(docRef, {
+			const sanitizedUpdates = sanitizeForFirestore({
 				...updates,
 				updatedAt: FirestoreTimestamp.now()
 			});
+			await updateDoc(docRef, sanitizedUpdates);
 		} catch (error) {
 			console.error(`Error updating document ${docId} in ${collectionName}:`, error);
 			throw error;
@@ -214,19 +221,6 @@ class Firestore {
 		return this.query<T>(collectionName, constraints);
 	}
 
-	/**
-	 * Get Firestore Timestamp utility
-	 */
-	static timestamp() {
-		return FirestoreTimestamp;
-	}
-
-	/**
-	 * Get current timestamp
-	 */
-	static now() {
-		return FirestoreTimestamp.now();
-	}
 }
 
 export const firestore = new Firestore();
