@@ -1,7 +1,7 @@
 import type { GitHubFile, RepoData, RepoVersion, Repository } from '$types/repository';
 
 // Framework detection types
-export type Framework = 'react' | 'nextjs' | 'svelte' | 'flask' | 'fastapi' | 'unknown';
+export type Framework = 'react' | 'nextjs' | 'svelte' | 'flask' | 'fastapi' | 'python-cli' | 'python-lib' | 'multi-framework' | 'unknown';
 
 // Subsystem types
 export interface Subsystem {
@@ -84,6 +84,7 @@ export interface AnalysisResult {
   subsystemDescriptions?: SubsystemDescription[];
   keyInterfaces?: FileInterface[];
   citations?: CitationLink[];
+  architectureDescription?: string;
 }
 
 // Updated subsystem interface to reference files by key
