@@ -136,6 +136,51 @@ Keep descriptions concise and focus on practical information for developers.`;
 }
 
 /**
+ * Generates AI-powered architecture description for the entire repository
+ */
+export async function generateArchitectureDescription(analysisResult: AnalysisResult): Promise<string> {
+  const prompt = `Analyze the architecture of this ${analysisResult.framework} repository called "${analysisResult.metadata.full_name}":
+
+Subsystems:
+${analysisResult.subsystems
+  .map((s) => {
+    const fileCount = Array.isArray(s.files) ? s.files.length : 0;
+    return `- ${s.name}: ${fileCount} files`;
+  })
+  .join("\n")}
+
+Framework: ${analysisResult.framework}
+Total Files: ${analysisResult.fileCount}
+
+Provide a clear, technical explanation of:
+1. The overall architecture pattern used
+2. How the subsystems interact with each other
+3. The data flow through the application
+4. Key architectural decisions and benefits
+5. Areas where developers should focus for maintenance
+
+Keep it practical and focused on helping developers understand the codebase structure.`;
+
+  const response = await makeOpenAIRequest(prompt);
+
+  if (response.success && response.data) {
+    return response.data.trim();
+  }
+
+  // Fallback description when AI fails
+  return `This ${analysisResult.framework} repository is organized into ${analysisResult.subsystems.length} main subsystems:
+
+${analysisResult.subsystems
+  .map((s) => {
+    const fileCount = Array.isArray(s.files) ? s.files.length : 0;
+    return `**${s.name}**: Contains ${fileCount} files focused on ${s.description.toLowerCase()}`;
+  })
+  .join("\n\n")}
+
+The architecture follows common ${analysisResult.framework} patterns with clear separation of concerns. Each subsystem has a specific responsibility, making the codebase maintainable and scalable.`;
+}
+
+/**
  * Enhanced main analysis function with AI integration and full TypeScript support
  */
 export async function analyzeRepoWithAI(repoData: any, files: GitHubFile[] | (GitHubFile & { content?: string })[]): Promise<AnalysisResult> {
